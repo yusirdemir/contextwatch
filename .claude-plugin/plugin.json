@@ -1,0 +1,8 @@
+{
+  "name": "contextwatch",
+  "version": "0.0.1",
+  "description": "Live prompt-cache and context telemetry for Claude Code.",
+  "author": { "name": "Yusuf Demir" },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

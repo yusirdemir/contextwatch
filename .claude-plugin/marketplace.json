@@ -1,0 +1,6 @@
+{
+  "name": "contextwatch",
+  "owner": { "name": "Yusuf Demir" },
+  "description": "Live prompt-cache and context telemetry for Claude Code.",
+  "plugins": [{ "name": "contextwatch", "source": "./" }]
+}
