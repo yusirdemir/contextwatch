@@ -6,7 +6,7 @@ Only the latest release receives security fixes.
 
 ## What contextwatch accesses
 
-contextwatch reads token counts and model names from Claude Code's own `turn.step` events. It does not read message text, does not write files, and makes no network requests. If you find it doing otherwise, treat that as a security issue.
+contextwatch reads token counts and model names from Claude Code's own `turn.step` events, and the session cost total and active model from `$.session`. It does not read message text, does not write files, and makes no network requests. If you find it doing otherwise, treat that as a security issue.
 
 ## Reporting a vulnerability
 

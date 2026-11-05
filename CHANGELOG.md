@@ -8,8 +8,11 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Live cache countdown in the status line and above the prompt.
-- Detail pane with hit rate, context size, model and recent responses.
+- Live cache countdown in the status line and above the prompt, in whole minutes, updated every 30 seconds.
+- Cost of the next message with a warm and a cold cache, from Anthropic list prices.
+- Cost of the first message after switching to each other model, and a warning in the band right after a switch.
+- Per-model cache tracking: a model used earlier in the session that is still warm is priced as a partial hit.
+- Detail pane with cost bars, a context growth chart with misses marked, hit rate and the session total.
 - Notice when a response had to write the cache again.
 - `/contextwatch` and `/contextwatch why` commands.
 - TTL inference from the gap between responses.

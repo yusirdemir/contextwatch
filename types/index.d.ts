@@ -19,6 +19,13 @@ export type Snapshot = {
 
 declare module 'claude-code' {
   interface PluginState {
-    contextwatch: { history: Snapshot[]; now: number }
+    contextwatch: {
+      history: Snapshot[]
+      now: number
+      // The session's total as Claude Code prices it; null where none is kept.
+      sessionUsd: number | null
+      // The model the next message goes to; null before it is known.
+      activeModel: string | null
+    }
   }
 }

@@ -17,6 +17,8 @@ const engine = (on: On) => {
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.status', () => ({ value: undefined }))
   on('ui.toast', () => ({ value: undefined }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1_000_000 }, rateLimits: [], cost: { usd: 1.23 } } }))
+  on('session.model', () => ({ value: 'claude-opus-5-5' }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('turn.step', async function* (_, e) {
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage }
@@ -48,11 +50,12 @@ test('a response starts the countdown', async ($, on) => {
   await clock.advance(12 * MIN)
 
   const ran = await $.command.run({ ...COMMAND, args: '' })
-  expect(ran.text).toMatch(/48:00 left/)
+  expect(ran.text).toMatch(/48 min left/)
+  expect(ran.text).toMatch(/next message ~\$0\.02/)
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const band = await $.ui.mount({ plugin: 'contextwatch', surface, component: 'AbovePrompt', props: { hasSurvey: false } as never })
-    expect((await band.find({ type: 'Text', text: /48:00 left/ }))?.text).toMatch(/113k context/)
+    expect((await band.find({ type: 'Text', text: /48 min left/ }))?.text).toMatch(/113k context/)
     await band.unmount()
   }
 })
@@ -80,7 +83,7 @@ test('the cache goes cold after its TTL', async ($, on) => {
   expect(ran.text).toMatch(/Cache cold/)
 })
 
-test('the pane shows the countdown and recent responses', async ($, on) => {
+test('the pane shows the countdown, switch costs and the session total', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
   engine(on)
 
@@ -103,8 +106,9 @@ test('the pane shows the countdown and recent responses', async ($, on) => {
         view: {},
       },
     })
-    expect((await pane.find({ type: 'Text', text: /55:00/ }))?.text).toBe('55:00')
-    expect(await pane.find({ type: 'Text', text: /Recent responses/ })).toBeDefined()
+    expect((await pane.find({ type: 'Text', text: /left$/ }))?.text).toBe('55 min left')
+    expect(await pane.find({ type: 'Text', text: /^Sonnet 5\.5/ })).toBeDefined()
+    expect((await pane.find({ type: 'Text', text: /^\$1\.23$/ }))?.text).toBe('$1.23')
     await pane.unmount()
   }
 })

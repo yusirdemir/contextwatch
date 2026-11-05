@@ -1,6 +1,7 @@
 import type { Snapshot } from '../../types'
 import { cacheDropped, formatTokens } from './metrics'
-import { formatAgo, TTL_MS, ttlLabel } from './ttl'
+import { isSameModel, modelLabel } from './pricing'
+import { formatDuration, TTL_MS, ttlLabel } from './ttl'
 
 // Why the last response missed the cache, in one sentence.
 export const explainLast = (list: readonly Snapshot[]): string => {
@@ -15,10 +16,10 @@ export const explainLast = (list: readonly Snapshot[]): string => {
   const written = formatTokens(last.cacheCreationTokens)
 
   if (gap > TTL_MS[prev.ttl]) {
-    return `The cache lapsed: the previous response was ${formatAgo(gap).replace(' ago', '')} earlier, past its ${ttlLabel(prev.ttl)} TTL. ${written} tokens were written again.`
+    return `The cache lapsed: the previous response was ${formatDuration(gap)} earlier, past its ${ttlLabel(prev.ttl)} TTL. ${written} tokens were written again.`
   }
-  if (prev.model !== last.model) {
-    return `The model changed from ${prev.model} to ${last.model}; each model has its own cache. ${written} tokens were written again.`
+  if (!isSameModel(prev.model, last.model)) {
+    return `The model changed from ${modelLabel(prev.model)} to ${modelLabel(last.model)}; each model has its own cache. ${written} tokens were written again.`
   }
 
   return `The prompt prefix changed (tools, system prompt or a compaction) while the cache was still warm. ${written} tokens were written again.`

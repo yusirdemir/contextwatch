@@ -62,6 +62,34 @@ A miss right after a model change says nothing about the TTL and is ignored.
 3. **Model changed**: each model has its own cache.
 4. **Otherwise**: the prompt prefix changed (tools, system prompt or a compaction).
 
+## Costs
+
+Prices come from Anthropic's published list prices, kept in `src/core/pricing.ts` with the date they were checked. A model that is not in the table shows no cost.
+
+| Token kind | Price |
+| --- | --- |
+| Uncached input | Input price |
+| Cache read | The model's cache-read price (0.025× to 0.1× of input) |
+| Cache write, five-minute TTL | 1.25× input price |
+| Cache write, one-hour TTL | 2× input price |
+| Output | Output price |
+
+```text
+next message, warm   = context × cacheRead
+next message, cold   = context × input × write multiplier
+switch to model M    = warmPrefix × cacheRead(M) + (context − warmPrefix) × input(M) × write multiplier
+```
+
+`warmPrefix` is the context size of the last response on model M, if M's cache is still warm; otherwise zero. Each model keeps its own cache, so a model used earlier in the session may still hold the start of the conversation.
+
+These figures cover the context alone. The new message and the answer are added on top and are not known in advance.
+
+The session total in the pane is Claude Code's own figure (`$.session.usage().cost.usd`, the same as `/cost`), not an estimate.
+
 ## Redrawing
 
-A one-second ticker writes the engine clock to `contextwatch.now` in session state. The band and the pane read it, so they redraw on every tick; the status line is updated in the same tick.
+A 30-second ticker writes the engine clock to `contextwatch.now` in session state, and refreshes the session total and the active model. The band and the pane read these values, so they redraw on each tick and after every turn. The UI shows whole minutes only, so a slower tick changes nothing you can see.
+
+## Charts
+
+The desktop app draws SVG, so the pane shows bars and a context chart as SVG in mid-tone colours that read on light and dark backgrounds. The terminal has no SVG; it gets the same bars and trend as block characters.

@@ -19,11 +19,11 @@ contextwatch is a Claude Code mod (a plugin with a hooks module) that shows how 
 | Path | Role |
 | --- | --- |
 | `hooks/register.tsx` | Entry point. Wires features together and runs the one-second ticker |
-| `src/core/` | Pure functions, no `$`. All the maths and formatting |
+| `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), formatting |
 | `src/sources/live.ts` | Turns `turn.step` usage into a `Snapshot` and stores it |
-| `src/ui/` | Status line, band above the prompt, detail pane, theme |
+| `src/ui/` | Status line, band above the prompt, detail pane, theme, `charts.ts` (SVG and text charts) |
 | `src/commands.ts` | `/contextwatch` and `/contextwatch why` |
-| `types/index.d.ts` | `$.state` contract: `contextwatch.history`, `contextwatch.now` |
+| `types/index.d.ts` | `$.state` contract: `history`, `now`, `sessionUsd`, `activeModel` under `contextwatch` |
 | `tests/` | `core.test.ts` (pure logic), `plugin.test.tsx` (engine and UI) |
 | `docs/` | How it works, and every field the mod reads |
 
@@ -49,6 +49,10 @@ npx tsc -p .
 
 `tsc` needs `.claude-plugin/types/`, which the engine writes when it first loads the mod (`claude --plugin-dir .`). The API reference is `.claude-plugin/types/claude-code/index.d.ts`; search it for an event or noun name rather than guessing a signature.
 
+## Prices
+
+`src/core/pricing.ts` holds Anthropic's list prices and `PRICES_AS_OF`. When a model is added or a price changes, update the table and the date together from the official pricing page, never from memory, and add a test for the new model.
+
 ## Design
 
-The UI must stay calm: one dim line in the band, colour only for the state marker (theme keys `success`, `warning`, `inactive`), no animation, no extra toasts. Anything new goes in the pane, not the band.
+The UI must stay calm: one dim line in the band, colour only for the state marker (theme keys `success`, `warning`, `inactive`), whole minutes only (no seconds, no fast ticking), no animation, no extra toasts. Anything new goes in the pane, not the band. SVG is drawn only where the surface has `Svg`; every chart needs a text fallback for the terminal.

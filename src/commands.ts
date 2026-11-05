@@ -2,8 +2,10 @@ import type { EngineInterface, On } from 'claude-code'
 import { atom, read } from 'claude-code'
 
 import { explainLast } from './core/explain'
+import { stayCost } from './core/forecast'
 import { contextTokens, formatPercent, formatTokens, hitRate } from './core/metrics'
-import { formatClock, remainingMs, ttlLabel } from './core/ttl'
+import { formatUsd } from './core/pricing'
+import { formatMinutes, remainingMs, ttlLabel } from './core/ttl'
 import { openPane } from './ui/pane'
 
 const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
@@ -26,11 +28,15 @@ export function answerCommand(on: On) {
     const last = list.at(-1)
     if (last === undefined) return { text: 'No response yet in this session.' }
 
-    const left = remainingMs(last, await read($, now))
-    const clock = left === 0 ? 'cold' : `${formatClock(left)} left`
+    const time = await read($, now)
+    const left = remainingMs(last, time)
+    const clock = left === 0 ? 'cold' : `${formatMinutes(left)} left`
+    const cost = stayCost(list, time)
+    const next = cost.warm ?? cost.cold
+    const price = next === null ? '' : ` · next message ~${formatUsd(next)}`
 
     return {
-      text: `Cache ${clock} (TTL ${ttlLabel(last.ttl)}) · ${formatPercent(hitRate(last))} hit · ${formatTokens(contextTokens(last))} tokens of context`,
+      text: `Cache ${clock} (TTL ${ttlLabel(last.ttl)}) · ${formatPercent(hitRate(last))} hit · ${formatTokens(contextTokens(last))} tokens of context${price}`,
     }
   })
 }

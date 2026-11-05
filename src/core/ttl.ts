@@ -1,5 +1,6 @@
 import type { Snapshot, Ttl, TtlSource } from '../../types'
 import { cacheDropped, hitRate } from './metrics'
+import { isSameModel } from './pricing'
 
 export const TTL_MS: Record<Ttl, number> = { '5m': 5 * 60_000, '1h': 60 * 60_000 }
 
@@ -24,8 +25,7 @@ export const inferTtl = (
 
   if (isPastShort && hitRate(probe) >= 0.5) return { ttl: '1h', ttlSource: 'observed' }
 
-  const isSameModel = prev.model === next.model
-  if (isPastShort && gap <= TTL_MS['1h'] && isSameModel && cacheDropped(probe)) {
+  if (isPastShort && gap <= TTL_MS['1h'] && isSameModel(prev.model, next.model) && cacheDropped(probe)) {
     return { ttl: '5m', ttlSource: 'observed' }
   }
 
@@ -44,24 +44,25 @@ export const warmth = (s: Snapshot, now: number): Warmth => {
   return left <= TTL_MS[s.ttl] / 6 ? 'cooling' : 'warm'
 }
 
-// 2832000 → "47:12".
-export const formatClock = (ms: number): string => {
-  const total = Math.ceil(ms / 1000)
-  const minutes = Math.floor(total / 60)
-  const seconds = total % 60
+// Whole minutes left, calm to read: "59 min", "<1 min", "cold".
+export const formatMinutes = (ms: number): string => {
+  if (ms <= 0) return 'cold'
 
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
+  const minutes = Math.floor(ms / 60_000)
+
+  return minutes < 1 ? '<1 min' : `${minutes} min`
 }
 
-// 45000 → "45s ago", 420000 → "7m ago", 5400000 → "1h 30m ago".
+// 45000 → "just now", 420000 → "7 min ago", 5400000 → "1 h 30 min ago".
 export const formatAgo = (ms: number): string => {
-  const seconds = Math.max(0, Math.floor(ms / 1000))
-  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(Math.max(0, ms) / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
 
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m ago`
+  return `${Math.floor(minutes / 60)} h ${minutes % 60} min ago`
 }
+
+// 5400000 → "1 h 30 min", 1200000 → "20 min".
+export const formatDuration = (ms: number): string => formatAgo(ms).replace(' ago', '').replace('just now', 'under a minute')
 
 export const ttlLabel = (ttl: Ttl): string => (ttl === '1h' ? '1 hour' : '5 minutes')
