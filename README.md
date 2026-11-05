@@ -10,14 +10,17 @@ Claude Code caches your conversation for a limited time, usually one hour. While
 contextwatch shows how much time is left and what the next message costs, so you know before you send.
 
 ```text
-● Cache 59 min left · next message ~$0.04 · 187k context   [Details]
+● Cache 59 min left · cache read ~$0.04 · cold ~$1.50   [Details]
 ```
 
 ## Features
 
 - **Countdown**: minutes left before the cache lapses, in the status line and above the prompt. It updates every 30 seconds and never shows seconds, so it stays out of the way.
-- **Next-message cost**: what the next message costs with a warm cache, and what it would cost cold.
-- **Model switch preview**: what the first message would cost on each other model, and a warning as soon as you switch.
+- **Cache cost**: what the context costs on the next message, as a cache read while warm and as a cache rewrite once cold.
+- **Model switch preview**: the cache cost of the first message on each other model, and a warning as soon as you switch.
+- **Switch confirmation**: asks before a model switch that would throw away a warm cache for more than $0.50 (configurable).
+- **MCP change warning**: flags a connected or dropped MCP server while the cache is warm, since the tool list is part of the cached prompt.
+- **Away reminder** (off by default): one notice a few minutes before the cache lapses.
 - **Calm colour**: green while warm, amber in the last ten minutes of an hour, grey once cold.
 - **Detail pane**: the countdown, the cost comparison as bars, a chart of context growth with misses marked, and the session total.
 - **Miss alerts**: a short notice when a response had to write the cache again.
@@ -42,10 +45,11 @@ Answer `y` to add the marketplace, then choose a scope. The pane opens with your
 
 | Where | What you see |
 | --- | --- |
-| Above the prompt | `● Cache 59 min left · next message ~$0.04 · 187k context` and a **Details** button |
-| After a model switch | `● Switched to Sonnet 5.5 · first message writes 187k tokens ~$0.75` |
-| Status line | `cache 59 min · next $0.04` |
-| Pane (**Context**) | Countdown, next-message cost, switch costs per model, context chart, session cost |
+| Above the prompt | `● Cache 59 min left · cache read ~$0.04 · cold ~$1.50` and a **Details** button |
+| After a model switch | `● Switched to Sonnet 5.5 · cache rewrite 187k tokens ~$0.75` |
+| After an MCP change | `● MCP servers changed (+github) · likely cache rewrite ~$1.50` |
+| Status line | `cache 59 min · read $0.04` |
+| Pane (**Context**) | Countdown, cache cost, switch costs per model, context chart, session cost |
 
 | Command | Does |
 | --- | --- |
@@ -53,6 +57,18 @@ Answer `y` to add the marketplace, then choose a scope. The pane opens with your
 | `/contextwatch why` | Explains why the last response missed the cache |
 
 The countdown starts after the first response of a session.
+
+## Settings
+
+Change these in the config menu, or under `pluginConfigs.contextwatch` in `~/.claude/settings.json`.
+
+| Setting | Default | Does |
+| --- | --- | --- |
+| `confirmSwitchUsd` | `0.5` | Ask before a model switch that would rewrite a warm cache for more than this many dollars. `0` turns it off. |
+| `awayReminder` | `false` | Send one notice shortly before the cache lapses. |
+| `awayReminderMinutes` | `5` | How many minutes before the cache lapses the notice is sent. |
+
+In terminals that support it (iTerm2, kitty, Ghostty) the reminder is a system notification; elsewhere, including the desktop app, it is an in-app notice that stays for a minute.
 
 ## How it works
 
@@ -66,13 +82,14 @@ Details: [docs/how-it-works.md](docs/how-it-works.md). Every field it reads: [do
 
 - **The countdown is an estimate.** The server can evict a cache entry early. The next response's hit rate shows what actually happened.
 - **Costs are estimates** from Anthropic's list prices. They cover the context only; your new message and the answer come on top. On a Pro or Max subscription they show the API equivalent, not what you are billed.
+- **The MCP warning is a heuristic.** It compares MCP servers in the tool list, so a tool loaded on demand from a server that was not loaded before can raise it. The next response's hit rate confirms.
 - **Unknown models** show no cost. Prices live in `src/core/pricing.ts`.
 - **History is per session.** A new or cleared session starts empty.
 - **The TTL starts as an assumption** (one hour) until a response confirms it.
 
 ## Privacy
 
-contextwatch reads token counts, model names and the session cost total only. It does not read your messages, write files, or make network requests. See [SECURITY.md](SECURITY.md).
+contextwatch reads token counts, model names, tool names and the session cost total only. It does not read your messages, write files, or make network requests. See [SECURITY.md](SECURITY.md).
 
 ## Contributing
 

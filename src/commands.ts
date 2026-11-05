@@ -32,8 +32,9 @@ export function answerCommand(on: On) {
     const left = remainingMs(last, time)
     const clock = left === 0 ? 'cold' : `${formatMinutes(left)} left`
     const cost = stayCost(list, time)
-    const next = cost.warm ?? cost.cold
-    const price = next === null ? '' : ` · next message ~${formatUsd(next)}`
+    const readPart = cost.warm === null ? '' : ` · cache read ~${formatUsd(cost.warm)}`
+    const rewrite = cost.cold === null ? '' : ` · cache rewrite ~${formatUsd(cost.cold)}`
+    const price = `${readPart}${rewrite}`
 
     return {
       text: `Cache ${clock} (TTL ${ttlLabel(last.ttl)}) · ${formatPercent(hitRate(last))} hit · ${formatTokens(contextTokens(last))} tokens of context${price}`,

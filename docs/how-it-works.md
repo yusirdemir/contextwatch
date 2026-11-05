@@ -86,6 +86,20 @@ These figures cover the context alone. The new message and the answer are added 
 
 The session total in the pane is Claude Code's own figure (`$.session.usage().cost.usd`, the same as `/cost`), not an estimate.
 
+## Guards
+
+### Model switch confirmation
+
+Claude Code raises `PreModelSwitch` before a switch, with `prompt_cache_warm` and `estimated_cache_write_usd` (its own price for writing the context to the new model). When the cache is warm and that estimate is at least `confirmSwitchUsd`, contextwatch answers `ask`, so Claude Code asks before switching. Otherwise the switch goes ahead untouched.
+
+### MCP changes
+
+The tool list is part of the cached prompt prefix, so connecting or dropping an MCP server rewrites the cache on the next message. After every response contextwatch records the MCP servers behind the tool list (`mcp__<server>__<tool>`). Each tick compares the current list against it; a difference while the cache is warm shows a warning in the band and the pane and a one-time notice. The next response resets the baseline.
+
+### Away reminder
+
+When `awayReminder` is on, the tick sends one notice per response once the time left drops below `awayReminderMinutes`.
+
 ## Redrawing
 
 A 30-second ticker writes the engine clock to `contextwatch.now` in session state, and refreshes the session total and the active model. The band and the pane read these values, so they redraw on each tick and after every turn. The UI shows whole minutes only, so a slower tick changes nothing you can see.

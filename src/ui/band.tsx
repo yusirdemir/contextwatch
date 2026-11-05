@@ -4,6 +4,7 @@ import { atom, read } from 'claude-code'
 import { stayCost, switchOptions } from '../core/forecast'
 import { contextTokens, formatTokens } from '../core/metrics'
 import { formatUsd, isSameModel, modelLabel } from '../core/pricing'
+import { formatChange } from '../core/tools'
 import { formatMinutes, remainingMs, warmth } from '../core/ttl'
 import { openPane } from './pane'
 import { COLOR, DOT } from './theme'
@@ -11,6 +12,7 @@ import { COLOR, DOT } from './theme'
 const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
 const activeModel = atom({ plugin: 'contextwatch', key: 'activeModel' } as const, null)
+const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, null)
 
 // One quiet line above the prompt.
 export function registerBand(on: On) {
@@ -22,6 +24,7 @@ export function registerBand(on: On) {
     const { Box, Button, Text } = $.ui.resolve(e)
     const time = await read($, now)
     const model = await read($, activeModel)
+    const change = await read($, toolChange)
     const state = warmth(last, time)
     const tokens = formatTokens(contextTokens(last))
     const words = describe()
@@ -41,19 +44,18 @@ export function registerBand(on: On) {
         const cost = option?.cost ?? null
         const price = cost === null ? '' : ` ~${formatUsd(cost)}`
 
-        return `Switched to ${modelLabel(model)} · first message writes ${tokens} tokens${price}`
+        return `Switched to ${modelLabel(model)} · cache rewrite ${tokens} tokens${price}`
       }
 
       const cost = stayCost(list, time)
-      if (state === 'cold') {
-        const price = cost.cold === null ? '' : ` ~${formatUsd(cost.cold)}`
+      const rewrite = cost.cold === null ? '' : ` ~${formatUsd(cost.cold)}`
+      if (state === 'cold') return `Cache cold · rewrite ${tokens} tokens${rewrite}`
+      if (change !== null) return `MCP servers changed (${formatChange(change)}) · likely cache rewrite${rewrite}`
 
-        return `Cache cold · next message writes ${tokens} tokens${price}`
-      }
+      const readPart = cost.warm === null ? '' : ` · cache read ~${formatUsd(cost.warm)}`
+      const cold = cost.cold === null ? '' : ` · cold${rewrite}`
 
-      const price = cost.warm === null ? '' : ` · next message ~${formatUsd(cost.warm)}`
-
-      return `Cache ${formatMinutes(remainingMs(last!, time))} left${price} · ${tokens} context`
+      return `Cache ${formatMinutes(remainingMs(last!, time))} left${readPart}${cold}`
     }
   })
 }

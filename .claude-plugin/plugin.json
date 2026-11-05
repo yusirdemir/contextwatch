@@ -2,7 +2,29 @@
   "name": "contextwatch",
   "version": "0.0.1",
   "description": "Live prompt-cache and context telemetry for Claude Code.",
-  "author": { "name": "Yusuf Demir" },
+  "author": {
+    "name": "Yusuf Demir"
+  },
   "license": "MIT",
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "confirmSwitchUsd": {
+      "type": "number",
+      "title": "Confirm model switches above (USD)",
+      "description": "Ask before a model switch that would rewrite a warm cache for more than this many dollars. 0 turns it off.",
+      "default": 0.5
+    },
+    "awayReminder": {
+      "type": "boolean",
+      "title": "Remind me before the cache cools",
+      "description": "Send one notification shortly before the cache lapses.",
+      "default": false
+    },
+    "awayReminderMinutes": {
+      "type": "number",
+      "title": "Reminder lead time (minutes)",
+      "description": "How many minutes before the cache lapses the reminder is sent.",
+      "default": 5
+    }
+  }
 }

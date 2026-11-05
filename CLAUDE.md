@@ -21,9 +21,12 @@ contextwatch is a Claude Code mod (a plugin with a hooks module) that shows how 
 | `hooks/register.tsx` | Entry point. Wires features together and runs the one-second ticker |
 | `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), formatting |
 | `src/sources/live.ts` | Turns `turn.step` usage into a `Snapshot` and stores it |
+| `src/sources/tools.ts` | MCP servers behind the current tool list |
 | `src/ui/` | Status line, band above the prompt, detail pane, theme, `charts.ts` (SVG and text charts) |
 | `src/commands.ts` | `/contextwatch` and `/contextwatch why` |
-| `types/index.d.ts` | `$.state` contract: `history`, `now`, `sessionUsd`, `activeModel` under `contextwatch` |
+| `src/guards.ts` | Model switch confirmation, away reminder, MCP change check |
+| `src/options.ts` | Reads the `userConfig` options declared in `plugin.json` |
+| `types/index.d.ts` | `$.state` contract: `history`, `now`, `sessionUsd`, `activeModel`, `toolBaseline`, `toolChange` under `contextwatch` |
 | `tests/` | `core.test.ts` (pure logic), `plugin.test.tsx` (engine and UI) |
 | `docs/` | How it works, and every field the mod reads |
 
@@ -35,6 +38,8 @@ The validator enforces these; breaking one fails `claude plugin validate`.
 - Each `$.state` atom must be declared in the file that reads or writes it: `const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])`. Importing the atom from another file is rejected.
 - `turn.step` is a streaming event: its hook is an `async function*` and forwards with `yield* next(e)`.
 - `on('session.start')` may be registered only once without a matcher.
+- Never name a local variable `read` or `update`: it shadows the state functions and the validator rejects the module.
+- New settings go in `userConfig` in `plugin.json` and are parsed in `src/options.ts`; document them in the README's Settings table.
 - In tests, read a `turn.step` stream to its end before asserting; the engine stand-ins must answer `ui.status` and `ui.toast` with `{ value: undefined }`.
 
 ## Verify every change

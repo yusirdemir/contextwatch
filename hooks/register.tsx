@@ -2,6 +2,9 @@ import type { EngineInterface, Register, Timer } from 'claude-code'
 import { atom, update } from 'claude-code'
 
 import { answerCommand, registerCommand } from '../src/commands'
+import { guardModelSwitch, watchAway } from '../src/guards'
+import type { Options } from '../src/options'
+import { readOptions } from '../src/options'
 import { watchLive } from '../src/sources/live'
 import { registerBand } from '../src/ui/band'
 import { openPane, registerPane } from '../src/ui/pane'
@@ -16,13 +19,15 @@ const TICK_MS = 30_000
 
 let ticker: Timer | undefined
 
-export const register: Register = on => {
+export const register: Register = (on, raw) => {
+  const options = readOptions(raw)
+
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await registerCommand($)
-    await tick($)
+    await tick($, options)
     ticker?.cancel()
-    ticker = $.clock.every(TICK_MS, () => void tick($))
+    ticker = $.clock.every(TICK_MS, () => void tick($, options))
     void openPane($)
 
     return started
@@ -30,23 +35,25 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
-    await tick($)
+    await tick($, options)
 
     return done
   })
 
   answerCommand(on)
   watchLive(on)
+  guardModelSwitch(on, options)
   registerBand(on)
   registerPane(on)
 }
 
 // Moves the shared clock on and refreshes what the engine knows; the band,
 // pane and status line redraw from it.
-async function tick($: EngineInterface) {
+async function tick($: EngineInterface, options: Options) {
   const time = await $.clock.now()
   await update($, now, () => time)
   await refresh($)
+  await watchAway($, options, time)
   await showStatus($)
 }
 

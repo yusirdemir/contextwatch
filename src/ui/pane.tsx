@@ -4,6 +4,7 @@ import { atom, read } from 'claude-code'
 import { stayCost, switchOptions } from '../core/forecast'
 import { cacheDropped, contextTokens, formatPercent, formatTokens, hitRate } from '../core/metrics'
 import { formatUsd, modelLabel, PRICES_AS_OF } from '../core/pricing'
+import { formatChange } from '../core/tools'
 import { formatAgo, formatMinutes, remainingMs, TTL_MS, ttlLabel, warmth } from '../core/ttl'
 import { barSvg, barText, INK, sparklineSvg, sparklineText } from './charts'
 import { COLOR, DOT, INK_OF, LABEL } from './theme'
@@ -11,6 +12,7 @@ import { COLOR, DOT, INK_OF, LABEL } from './theme'
 const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
 const sessionUsd = atom({ plugin: 'contextwatch', key: 'sessionUsd' } as const, null)
+const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, null)
 
 export const PANE = 'contextwatch'
 
@@ -38,6 +40,7 @@ export function registerPane(on: On) {
 
     const time = await read($, now)
     const total = await read($, sessionUsd)
+    const change = await read($, toolChange)
     const state = warmth(last, time)
     const left = remainingMs(last, time)
     const ttlNote = last.ttlSource === 'observed' ? 'seen in this session' : 'assumed'
@@ -84,14 +87,23 @@ export function registerPane(on: On) {
           {bar('ttl', left / TTL_MS[last.ttl], INK_OF[state])}
         </Box>
 
+        {change !== null && state !== 'cold' && (
+          <Box flexDirection="column">
+            <Text color="warning">MCP servers changed: {formatChange(change)}</Text>
+            <Text dimColor size="caption">
+              The tool list is part of the cached prompt, so the next message likely rewrites the cache.
+            </Text>
+          </Box>
+        )}
+
         <Box flexDirection="column">
-          <Text weight="medium">Next message</Text>
+          <Text weight="medium">Cache cost of the next message</Text>
           {stay.warm !== null &&
-            row('warm', `Stay on ${modelLabel(last.model)}`, formatUsd(stay.warm), bar('b-warm', stay.warm / maxCost, INK.warm))}
+            row('warm', 'Cache read (warm)', formatUsd(stay.warm), bar('b-warm', stay.warm / maxCost, INK.warm))}
           {stay.cold !== null &&
-            row('cold', 'If the cache is cold', formatUsd(stay.cold), bar('b-cold', stay.cold / maxCost, INK.muted))}
+            row('cold', 'Cache rewrite (cold)', formatUsd(stay.cold), bar('b-cold', stay.cold / maxCost, INK.muted))}
           <Text dimColor size="caption">
-            For the {formatTokens(contextTokens(last))} tokens of context; your message and the answer come on top.
+            For the {formatTokens(contextTokens(last))} tokens already in context on {modelLabel(last.model)}. Your new message and the answer come on top.
           </Text>
         </Box>
 
@@ -108,7 +120,7 @@ export function registerPane(on: On) {
               ),
             )}
           <Text dimColor size="caption">
-            Each model keeps its own cache, so the first message after a switch writes the context again.
+            Cache cost of the first message on each model. Each model keeps its own cache, so a switch rewrites the context.
           </Text>
         </Box>
 

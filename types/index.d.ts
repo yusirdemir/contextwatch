@@ -17,6 +17,9 @@ export type Snapshot = {
   outputTokens: number
 }
 
+// MCP servers connected or dropped since the last response.
+export type ToolChange = { added: string[]; removed: string[] }
+
 declare module 'claude-code' {
   interface PluginState {
     contextwatch: {
@@ -26,6 +29,9 @@ declare module 'claude-code' {
       sessionUsd: number | null
       // The model the next message goes to; null before it is known.
       activeModel: string | null
+      // MCP servers at the last response; null before the first.
+      toolBaseline: string[] | null
+      toolChange: ToolChange | null
     }
   }
 }

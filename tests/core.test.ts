@@ -5,6 +5,7 @@ import { explainLast } from '../src/core/explain'
 import { cacheDropped, contextTokens, formatTokens, hitRate } from '../src/core/metrics'
 import { stayCost, switchOptions } from '../src/core/forecast'
 import { formatUsd, modelLabel, priceOf, promptCost, responseCost } from '../src/core/pricing'
+import { diffServers, formatChange, serversOf } from '../src/core/tools'
 import { formatAgo, formatMinutes, inferTtl, remainingMs, warmth } from '../src/core/ttl'
 
 const MIN = 60_000
@@ -127,4 +128,19 @@ test('switching models writes the context again unless that model is still warm'
   expect(near(sonnet?.cost, (60_402 * 0.2 + 40_000 * 2 * 2) / 1e6)).toBe(true)
   expect(haiku?.warmMs).toBe(0)
   expect(near(haiku?.cost, (100_402 * 0.5 * 2) / 1e6)).toBe(true)
+})
+
+test('MCP server changes are read from the tool list', () => {
+  const tools = [
+    { name: 'Bash', mcp: false },
+    { name: 'mcp__github__create_issue', mcp: true },
+    { name: 'mcp__github__list_prs', mcp: true },
+    { name: 'mcp__slack__send', mcp: true },
+  ]
+  expect(serversOf(tools)).toEqual(['github', 'slack'])
+  expect(diffServers(['github'], ['github'])).toBeNull()
+
+  const change = diffServers(['github', 'jira'], ['github', 'slack'])
+  expect(change).toEqual({ added: ['slack'], removed: ['jira'] })
+  expect(formatChange(change!)).toBe('+slack −jira')
 })
