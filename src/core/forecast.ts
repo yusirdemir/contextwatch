@@ -81,3 +81,23 @@ export const questionCost = (list: readonly Snapshot[], turns = 3): number | nul
 
   return recent.reduce((a, b) => a + b, 0) / recent.length
 }
+
+// The least any next question can cost: one request that reads the whole
+// context from the cache. Tool calls and longer answers only add to it.
+export const floorCost = (list: readonly Snapshot[], now: number): number | null => {
+  const last = list.at(-1)
+  if (last === undefined) return null
+
+  const context = contextTokens(last)
+
+  return remainingMs(last, now) > 0 ? promptCost(last.model, context, context, last.ttl) : promptCost(last.model, context, 0, last.ttl)
+}
+
+// What the next question will add while the cache is warm: like the recent
+// ones, and never less than the floor.
+export const nextQuestionCost = (list: readonly Snapshot[], now: number): number | null => {
+  const floor = floorCost(list, now)
+  const typical = questionCost(list)
+
+  return typical === null ? floor : Math.max(typical, floor ?? 0)
+}

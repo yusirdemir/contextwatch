@@ -19,7 +19,7 @@ contextwatch is a Claude Code mod (a plugin with a hooks module) that shows how 
 | Path | Role |
 | --- | --- |
 | `hooks/register.tsx` | Entry point. Wires features together and runs the one-second ticker |
-| `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), `compact.ts` (compact-now advice), `usage.ts` (usage windows, the learned points-per-dollar ratio, impact formatting), formatting |
+| `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), `compact.ts` (compact-now advice), `usage.ts` (usage windows, the learned points-per-dollar ratio, impact and landing formatting), formatting |
 | `src/sources/live.ts` | Turns `turn.step` usage into a `Snapshot` and stores it |
 | `src/sources/tools.ts` | MCP servers behind the current tool list |
 | `src/sources/compact.ts` | Learns compaction sizes from `session.compact`; the Compact button's call |
@@ -60,7 +60,7 @@ npx tsc -p .
 
 ## Units
 
-Subscribers see usage as points of the 5-hour window (`formatImpact`), never dollars; dollars appear only where there are no usage windows (an API key). Route every user-facing cost through `formatImpact`. Show a cost only for what is true now (a cold cache, a switch or MCP change about to rewrite it), never a hypothetical "if cold" figure; the per-question cost is real (recent turns). Usage windows belong in the pane, not the band.
+Subscribers see usage as points of the 5-hour window (`formatImpact`), never dollars; dollars appear only where there are no usage windows (an API key). Route every user-facing cost through `formatImpact`. Show a cost only for what is true now (a cold cache, a switch or MCP change about to rewrite it), never a hypothetical "if cold" figure; the next-question figure is a measured estimate (recent turns, floored at one read of the context). Usage windows belong in the pane, not the band.
 
 ## Prices
 

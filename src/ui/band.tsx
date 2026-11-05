@@ -3,12 +3,12 @@ import { atom, read } from 'claude-code'
 
 import type { Calibration, CompactStats, Limits, Snapshot, ToolChange } from '../../types'
 import { compactAdvice } from '../core/compact'
-import { questionCost, stayCost, switchOptions } from '../core/forecast'
+import { nextQuestionCost, stayCost, switchOptions } from '../core/forecast'
 import { contextTokens, formatTokens } from '../core/metrics'
 import { isSameModel, modelLabel } from '../core/pricing'
 import { formatChange } from '../core/tools'
 import { formatMinutes, remainingMs, warmth } from '../core/ttl'
-import { formatImpact, formatPerQuestion } from '../core/usage'
+import { formatImpact } from '../core/usage'
 import { compactNow } from '../sources/compact'
 import { openPane } from './pane'
 import { COLOR, DOT } from './theme'
@@ -90,9 +90,10 @@ const lineFor = ({ list, time, model, change, stats, windows, cal }: Inputs): Li
     return { dot: DOT.cold, color: COLOR.cold, words: `Cache cold · next message rewrites ${tokens}${cold === null ? '' : ` (${cold})`}` }
   }
 
-  // While warm, what each question is costing now; it grows with the context.
-  const perQuestion = formatImpact(questionCost(list), windows, cal)
-  const cost = perQuestion === null ? '' : ` · ${formatPerQuestion(perQuestion)}`
+  // While warm, what the next question will add, judged by the recent ones.
+  // It grows with the context, since every request re-reads all of it.
+  const next = formatImpact(nextQuestionCost(list, time), windows, cal)
+  const cost = next === null ? '' : ` · next question ${next}`
   const words = `Cache ${state === 'cooling' ? 'cooling' : 'warm'} · ${formatMinutes(remainingMs(last, time))}${cost}`
 
   // Cooling is the moment to compact: reading the context is still cheap.

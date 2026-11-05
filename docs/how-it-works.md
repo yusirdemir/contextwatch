@@ -53,9 +53,18 @@ The live usage figures do not say which TTL an entry was written with. contextwa
 
 A miss right after a model change says nothing about the TTL and is ignored.
 
-## Cost per question
+## Next question
 
-Every request of a turn is recorded with its `turnId`. A question's cost is the sum of its requests at list price; the band shows the average of the last three, as points of the 5-hour window (or dollars with an API key). Each request re-reads the whole context from the cache, so the figure grows as the conversation grows and drops after a compaction.
+Every request of a turn is recorded with its `turnId`, and a question's cost is the sum of its requests at list price. The next question is estimated as:
+
+```text
+floor     = context × cacheRead            one request that only reads the context (warm)
+          = context × input × write mult   the rewrite (cold)
+typical   = average of the last three questions
+next      = max(typical, floor)
+```
+
+The band shows `next` as points of the 5-hour window; the pane adds where the window lands (`41% → 43%`) and draws it as a faint segment on the bar, with the floor when it differs. Each request re-reads the whole context, so both grow as the conversation grows and drop after a compaction.
 
 ## Explaining a miss
 
@@ -100,7 +109,7 @@ contextwatch learns that from the session itself. It keeps an anchor (session co
 impact of a cold cache = cold rewrite (list price) × points per dollar
 ```
 
-When the cache is cold, the pane draws that impact as a faint segment past the 5-hour fill. While it is warm, no hypothetical figure is shown. Until the first sample, the `+%` figures are left out. Other sessions using the same account at the same time move the window too, which makes the estimate high rather than low.
+The pane draws the next message's impact as a faint segment past the 5-hour fill: the next question while warm, the rewrite once cold. Until the first sample, the `+%` figures are left out. Other sessions using the same account at the same time move the window too, which makes the estimate high rather than low.
 
 With an API key there are no windows; contextwatch shows dollars instead.
 

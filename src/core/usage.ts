@@ -76,7 +76,12 @@ export const formatUntil = (at: number | null, now: number): string | null => {
   return `${Math.floor(hours / 24)} d ${hours % 24} h`
 }
 
-// "~0.8% per question" or "~$0.31 per question".
-export const formatPerQuestion = (impact: string): string => `${impact.startsWith('+') ? `~${impact.slice(1)}` : impact} per question`
+// The points of the 5-hour window `usd` moves; null while the ratio is unknown.
+export const pointsOf = (usd: number | null, cal: Calibration): number | null =>
+  usd === null || cal.percentPerUsd === null ? null : usd * cal.percentPerUsd
+
+// "41% → 43%": where the 5-hour window lands after `points` more.
+export const formatLanding = (window: LimitWindow, points: number): string =>
+  `${formatPercentUsed(window.percent)} → ${formatPercentUsed(Math.min(100, window.percent + points))}`
 
 export const formatPercentUsed = (percent: number): string => `${Math.round(percent)}%`

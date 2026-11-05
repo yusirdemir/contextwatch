@@ -10,17 +10,17 @@ Claude Code caches your conversation for a limited time, usually one hour. While
 contextwatch shows how much time is left, and when the cache has gone cold it says what the next message will cost, so you know before you send.
 
 ```text
-● Cache warm · 55 min · ~0.8% per question   [Details]
+● Cache warm · 55 min · next question +2.3%   [Details]
 ```
 
 ## Features
 
 - **Countdown**: minutes left before the cache lapses, above the prompt. It updates every 30 seconds and never shows seconds, so it stays out of the way. Costs appear only when they apply: once the cache is cold, or a switch is about to rewrite it.
-- **Cost per question**: what your recent questions cost on average, each the sum of its requests. It grows as the context grows, since every request re-reads the whole conversation; compacting resets it.
+- **Next question**: what your next question will add to the 5-hour window, judged by your recent questions and never less than one read of the whole context. The pane shows where it lands (`41% → 43%`) as a faint segment on the bar. It grows as the context grows; compacting resets it.
 - **Cold-send question**: send a message into a large cold cache and contextwatch asks first: send anyway, compact then send, or start fresh then send.
 - **Compact before you leave**: in the last ten minutes, a quiet grey tip compares compacting now with coming back to a cold cache, with a **Compact** button. A compaction reads the whole context, which is cheap only while it is still cached.
 - **Alerts in place**: after a model switch or an MCP change that will rewrite a warm cache, the line above the prompt turns amber and says so.
-- **Usage limits** (in the pane): the 5-hour and weekly windows of a Pro or Max subscription, with when each resets. When the cache is cold, the 5-hour bar shows what the next message adds as a faint segment. With an API key, dollars instead.
+- **Usage limits** (in the pane): the 5-hour and weekly windows of a Pro or Max subscription, with when each resets. The 5-hour bar shows what the next message adds as a faint segment, with where it lands (`41% → 43%`). With an API key, dollars instead.
 - **Model switch preview**: what the first message on each other model would add, and a warning as soon as you switch.
 - **Switch confirmation**: asks before a model switch that would throw away a warm cache for more than $0.50 (configurable).
 - **MCP change warning**: flags a connected or dropped MCP server while the cache is warm, since the tool list is part of the cached prompt.
@@ -49,7 +49,7 @@ Answer `y` to add the marketplace, then choose a scope. The pane opens with your
 
 | Where | What you see |
 | --- | --- |
-| Above the prompt | `● Cache warm · 55 min · ~0.8% per question` and a **Details** button that opens the pane |
+| Above the prompt | `● Cache warm · 55 min · next question +2.3%` and a **Details** button that opens the pane |
 | Above the prompt, cooling | `● Cache cooling · 8 min · Leaving? Compact first` and a **Compact** button |
 | Above the prompt, cold | `○ Cache cold · next message rewrites 187k (+6%)` |
 | Above the prompt, after a model switch | `● Switched to Sonnet 5.5 · cache rewrite +3%` |

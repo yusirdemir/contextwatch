@@ -4,10 +4,10 @@ import type { Snapshot } from '../types'
 import { compactAdvice } from '../src/core/compact'
 import { explainLast } from '../src/core/explain'
 import { cacheDropped, contextTokens, formatTokens, hitRate } from '../src/core/metrics'
-import { questionCost, stayCost, switchOptions } from '../src/core/forecast'
+import { floorCost, nextQuestionCost, questionCost, stayCost, switchOptions } from '../src/core/forecast'
 import { formatUsd, modelLabel, priceOf, promptCost, responseCost } from '../src/core/pricing'
 import { diffServers, formatChange, serversOf } from '../src/core/tools'
-import { calibrate, formatImpact, formatPerQuestion, formatUntil, parseLimits } from '../src/core/usage'
+import { calibrate, formatImpact, formatLanding, formatUntil, parseLimits, pointsOf } from '../src/core/usage'
 import { formatAgo, formatMinutes, inferTtl, remainingMs, warmth } from '../src/core/ttl'
 
 const MIN = 60_000
@@ -210,7 +210,23 @@ test('a question costs the sum of its requests, averaged over recent turns', () 
   const many = ['a', 'b', 'c', 'd'].map(turnId => snap({ turnId }))
   expect(near(questionCost([snap({ turnId: 'z', cacheReadTokens: 900_000 }), ...many]), one)).toBe(true)
   expect(questionCost([snap()])).toBeNull()
+})
 
-  expect(formatPerQuestion('+0.8%')).toBe('~0.8% per question')
-  expect(formatPerQuestion('~$0.31')).toBe('~$0.31 per question')
+test('the next question costs at least one read of the context', () => {
+  const list = [snap({ at: 0, turnId: 'a' })]
+  // One cache read of 100,402 tokens on Opus 5.5.
+  expect(near(floorCost(list, MIN), 100_402 * 0.2 / 1e6)).toBe(true)
+  // Cold, the floor is the rewrite.
+  expect(near(floorCost(list, 61 * MIN), 100_402 * 4 * 2 / 1e6)).toBe(true)
+  // The recent turn cost more than the floor, so it sets the estimate.
+  expect(near(nextQuestionCost(list, MIN), responseCost(snap())!)).toBe(true)
+  // A cheap recent turn never takes the estimate below the floor.
+  const cheap = [snap({ at: 0, turnId: 'a', cacheReadTokens: 0, cacheCreationTokens: 0, inputTokens: 10, outputTokens: 0 }), snap({ at: 0 })]
+  expect(near(nextQuestionCost(cheap, MIN), floorCost(cheap, MIN)!)).toBe(true)
+
+  const cal = { anchor: null, percentPerUsd: 5 }
+  expect(pointsOf(0.4, cal)).toBe(2)
+  expect(pointsOf(0.4, { anchor: null, percentPerUsd: null })).toBeNull()
+  expect(formatLanding({ percent: 41, resetsAt: null }, 2.3)).toBe('41% → 43%')
+  expect(formatLanding({ percent: 99, resetsAt: null }, 5)).toBe('99% → 100%')
 })

@@ -386,8 +386,19 @@ test('the usage a cold cache would add is learned from the spend', async ($, on)
 
   // While warm, the band says what a question has been costing.
   const warm = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
-  expect((await warm.find({ type: 'Text', text: /Cache/ }))?.text).toBe('Cache warm · 59 min · <0.1% per question ')
+  expect((await warm.find({ type: 'Text', text: /Cache/ }))?.text).toBe('Cache warm · 59 min · next question <0.1% ')
   await warm.unmount()
+
+  // The pane says where the 5-hour window lands after it.
+  const pane = await $.ui.mount({
+    plugin: 'contextwatch',
+    surface: 'desktop',
+    component: 'Pane',
+    requestId: 'contextwatch',
+    props: { title: 'Context', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} },
+  })
+  expect((await pane.find({ type: 'Text', text: /^Next question/ }))?.text).toMatch(/44% → 44%/)
+  await pane.unmount()
 
   // Once cold, a rewrite of 113k tokens on Opus 5.5 is ~$0.91, so ~1.8 points.
   await clock.advance(61 * MIN)

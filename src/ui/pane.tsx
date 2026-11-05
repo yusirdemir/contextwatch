@@ -1,14 +1,14 @@
 import type { EngineInterface, On } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { Calibration, Limits, LimitWindow } from '../../types'
+import type { Limits, LimitWindow } from '../../types'
 import { compactAdvice } from '../core/compact'
-import { questionCost, stayCost, switchOptions } from '../core/forecast'
+import { floorCost, nextQuestionCost, stayCost, switchOptions } from '../core/forecast'
 import { cacheDropped, contextTokens, formatPercent, formatTokens, hitRate } from '../core/metrics'
 import { isSameModel, modelLabel } from '../core/pricing'
 import { formatChange } from '../core/tools'
 import { formatMinutes, remainingMs, TTL_MS, ttlLabel, warmth } from '../core/ttl'
-import { formatImpact, formatPercentUsed, formatPerQuestion, formatUntil } from '../core/usage'
+import { formatImpact, formatLanding, formatPercentUsed, formatUntil, pointsOf } from '../core/usage'
 import { compactNow } from '../sources/compact'
 import { barSvg, barText, usageInk, usageSvg, usageText } from './charts'
 import { COLOR, DOT, INK_OF, LABEL } from './theme'
@@ -30,9 +30,6 @@ const CONTENT_CELLS = 56
 export async function openPane($: EngineInterface) {
   await $.ui.open({ id: PANE, title: 'Context' })
 }
-
-// The points of the 5-hour window `usd` moves, when the ratio is known.
-const pointsOf = (usd: number | null, cal: Calibration): number => (usd === null || cal.percentPerUsd === null ? 0 : usd * cal.percentPerUsd)
 
 // The pane beside the chat: how long the cache stays warm, how full the
 // usage windows are and what a cold cache would add, and at most one suggestion.
@@ -62,8 +59,7 @@ export function registerPane(on: On) {
     const state = warmth(last, time)
     const left = remainingMs(last, time)
     const coldUsd = stayCost(list, time).cold
-    const coldImpact = formatImpact(coldUsd, windows, cal)
-    const perQuestion = formatImpact(questionCost(list), windows, cal)
+    const floorUsd = floorCost(list, time)
     const misses = list.filter((s, i) => i > 0 && cacheDropped(s)).length
     const isSwitched = model !== null && !isSameModel(model, last.model)
     const advice = state === 'cooling' ? compactAdvice(list, time, stats) : null
@@ -112,14 +108,22 @@ export function registerPane(on: On) {
     }
 
     const usage = (() => {
+      // What the next message adds: a cache rewrite when cold, otherwise a
+      // question like the recent ones, never less than one read of the context.
+      const nextUsd = state === 'cold' ? coldUsd : nextQuestionCost(list, time)
+      const floor = state === 'cold' ? null : formatImpact(floorUsd, windows, cal)
+      const next = formatImpact(nextUsd, windows, cal)
+
       if (windows === null) {
-        return state !== 'cold' || coldImpact === null ? null : (
-          <Text dimColor>The next message rewrites the cache: {coldImpact}.</Text>
+        return next === null ? null : (
+          <Text dimColor>
+            {state === 'cold' ? `Next message rewrites the cache: ${next}.` : `Next question: about ${next}${floor === null ? '' : `, at least ${floor}`}.`}
+          </Text>
         )
       }
 
-      // The faint segment is what the next message adds, shown only when it will.
-      const extra = state === 'cold' ? pointsOf(coldUsd, cal) : 0
+      const points = pointsOf(nextUsd, cal)
+      const extra = points ?? 0
 
       return (
         <Box flexDirection="column" gap={1}>
@@ -128,9 +132,15 @@ export function registerPane(on: On) {
           </Text>
           {windows.fiveHour !== null && usageRow('five', '5-hour', windows.fiveHour, extra)}
           {windows.weekly !== null && usageRow('week', 'Weekly', windows.weekly, 0)}
-          {state === 'cold' && coldImpact !== null && (
+          {next !== null && points !== null && windows.fiveHour !== null && (
             <Text dimColor size="caption">
-              The next message rewrites the cache: about {coldImpact} of the 5-hour window (the faint part).
+              {state === 'cold' ? `Next message rewrites the cache: ${next}` : `Next question: ${next}`}
+              {floor !== null && floor !== next ? ` (at least ${floor})` : ''} · {formatLanding(windows.fiveHour, points)}
+            </Text>
+          )}
+          {next === null && (
+            <Text dimColor size="caption">
+              Learning how much a question moves your 5-hour window.
             </Text>
           )}
         </Box>
@@ -204,11 +214,7 @@ export function registerPane(on: On) {
               ? 'The next message rewrites the cache.'
               : `left of a ${ttlLabel(last.ttl)} cache${last.ttlSource === 'default' ? ' (assumed)' : ''}`}
           </Text>
-          {state !== 'cold' && perQuestion !== null && (
-            <Text dimColor size="caption">
-              {formatPerQuestion(perQuestion)} lately, growing as the context grows.
-            </Text>
-          )}
+
         </Box>
 
         {usage}
