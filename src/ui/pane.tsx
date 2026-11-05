@@ -3,12 +3,12 @@ import { atom, read, update } from 'claude-code'
 
 import type { Calibration, Limits, LimitWindow } from '../../types'
 import { compactAdvice } from '../core/compact'
-import { stayCost, switchOptions } from '../core/forecast'
+import { questionCost, stayCost, switchOptions } from '../core/forecast'
 import { cacheDropped, contextTokens, formatPercent, formatTokens, hitRate } from '../core/metrics'
 import { isSameModel, modelLabel } from '../core/pricing'
 import { formatChange } from '../core/tools'
 import { formatMinutes, remainingMs, TTL_MS, ttlLabel, warmth } from '../core/ttl'
-import { formatImpact, formatPercentUsed, formatUntil } from '../core/usage'
+import { formatImpact, formatPercentUsed, formatPerQuestion, formatUntil } from '../core/usage'
 import { compactNow } from '../sources/compact'
 import { barSvg, barText, usageInk, usageSvg, usageText } from './charts'
 import { COLOR, DOT, INK_OF, LABEL } from './theme'
@@ -63,6 +63,7 @@ export function registerPane(on: On) {
     const left = remainingMs(last, time)
     const coldUsd = stayCost(list, time).cold
     const coldImpact = formatImpact(coldUsd, windows, cal)
+    const perQuestion = formatImpact(questionCost(list), windows, cal)
     const misses = list.filter((s, i) => i > 0 && cacheDropped(s)).length
     const isSwitched = model !== null && !isSameModel(model, last.model)
     const advice = state === 'cooling' ? compactAdvice(list, time, stats) : null
@@ -203,6 +204,11 @@ export function registerPane(on: On) {
               ? 'The next message rewrites the cache.'
               : `left of a ${ttlLabel(last.ttl)} cache${last.ttlSource === 'default' ? ' (assumed)' : ''}`}
           </Text>
+          {state !== 'cold' && perQuestion !== null && (
+            <Text dimColor size="caption">
+              {formatPerQuestion(perQuestion)} lately, growing as the context grows.
+            </Text>
+          )}
         </Box>
 
         {usage}

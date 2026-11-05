@@ -76,4 +76,7 @@ export const formatUntil = (at: number | null, now: number): string | null => {
   return `${Math.floor(hours / 24)} d ${hours % 24} h`
 }
 
+// "~0.8% per question" or "~$0.31 per question".
+export const formatPerQuestion = (impact: string): string => `${impact.startsWith('+') ? `~${impact.slice(1)}` : impact} per question`
+
 export const formatPercentUsed = (percent: number): string => `${Math.round(percent)}%`

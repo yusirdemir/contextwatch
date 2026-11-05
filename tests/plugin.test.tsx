@@ -294,7 +294,7 @@ test('an MCP server change while warm is flagged in the band', async ($, on) => 
   await after.unmount()
 })
 
-test('the status line says only the cache state, with a cost once cold', async ($, on) => {
+test('nothing is pinned under the prompt', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
   const lines: (string | undefined)[] = []
   engine(on, { onStatus: text => lines.push(text) })
@@ -303,10 +303,8 @@ test('the status line says only the cache state, with a cost once cold', async (
   await drain($.turn.step(STEP))
   await clock.advance(5 * MIN)
 
-  expect(lines.at(-1)).toBe('cache 55 min')
-
-  await clock.advance(56 * MIN)
-  expect(lines.at(-1)).toBe('cache cold')
+  // Only the clearing call at start: the band carries the countdown.
+  expect(lines).toEqual([undefined])
 })
 
 test('a model switch shows the line above the prompt', async ($, on) => {
@@ -382,6 +380,11 @@ test('the usage a cold cache would add is learned from the spend', async ($, on)
   u = { usd: 3, five: 44, week: 21 }
   await clock.advance(MIN)
 
+  // While warm, the band says what a question has been costing.
+  const warm = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
+  expect((await warm.find({ type: 'Text', text: /Cache/ }))?.text).toBe('Cache warm · 59 min · <0.1% per question ')
+  await warm.unmount()
+
   // Once cold, a rewrite of 113k tokens on Opus 5.5 is ~$0.91, so ~1.8 points.
   await clock.advance(61 * MIN)
   const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
@@ -391,17 +394,13 @@ test('the usage a cold cache would add is learned from the spend', async ($, on)
 
 test('with an API key, dollars stand in for usage', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
-  const lines: (string | undefined)[] = []
-  engine(on, { usage: () => ({ usd: 1.23 }), onStatus: text => lines.push(text) })
+  engine(on, { usage: () => ({ usd: 1.23 }) })
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await drain($.turn.step(STEP))
   await clock.advance(5 * MIN)
 
-  expect(lines.at(-1)).toBe('cache 55 min')
-
   await clock.advance(56 * MIN)
-  expect(lines.at(-1)).toBe('cache cold · next message ~$0.91')
   const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
   expect((await band.find({ type: 'Text', text: /Cache/ }))?.text).toMatch(/Cache cold · next message rewrites 113k \(~\$0\.91\)/)
   await band.unmount()

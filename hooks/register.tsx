@@ -10,7 +10,6 @@ import { watchCompactions } from '../src/sources/compact'
 import { watchLive } from '../src/sources/live'
 import { registerBand } from '../src/ui/band'
 import { openPane, registerPane } from '../src/ui/pane'
-import { showStatus } from '../src/ui/status'
 
 const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
 const sessionUsd = atom({ plugin: 'contextwatch', key: 'sessionUsd' } as const, null)
@@ -32,6 +31,8 @@ export const register: Register = (on, raw) => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await registerCommand($)
+    // The band says it all; clear a status line an older version pinned.
+    $.ui.status(undefined)
     await loadRatio($)
     await tick($, options)
     ticker?.cancel()
@@ -57,14 +58,13 @@ export const register: Register = (on, raw) => {
   registerPane(on)
 }
 
-// Moves the shared clock on and refreshes what the engine knows; the band,
-// pane and status line redraw from it.
+// Moves the shared clock on and refreshes what the engine knows; the band
+// and the pane redraw from it.
 async function tick($: EngineInterface, options: Options) {
   const time = await $.clock.now()
   await update($, now, () => time)
   await refresh($)
   await watchAway($, options, time)
-  await showStatus($)
 }
 
 async function refresh($: EngineInterface) {

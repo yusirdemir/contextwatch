@@ -23,7 +23,7 @@ contextwatch is a Claude Code mod (a plugin with a hooks module) that shows how 
 | `src/sources/live.ts` | Turns `turn.step` usage into a `Snapshot` and stores it |
 | `src/sources/tools.ts` | MCP servers behind the current tool list |
 | `src/sources/compact.ts` | Learns compaction sizes from `session.compact`; the Compact button's call |
-| `src/ui/` | Status line, band above the prompt, detail pane, theme, `charts.ts` (progress bar as SVG and text) |
+| `src/ui/` | Band above the prompt, detail pane, theme, `charts.ts` (progress bar as SVG and text) |
 | `src/commands.ts` | `/contextwatch` and `/contextwatch why` |
 | `src/guards.ts` | Model switch confirmation, away reminder, MCP change check |
 | `src/options.ts` | Reads the `userConfig` options declared in `plugin.json` |
@@ -60,7 +60,7 @@ npx tsc -p .
 
 ## Units
 
-Subscribers see usage as points of the 5-hour window (`formatImpact`), never dollars; dollars appear only where there are no usage windows (an API key). Route every user-facing cost through `formatImpact`. Show a cost only for what is true now (a cold cache, a switch or MCP change about to rewrite it), never a hypothetical "if cold" figure; usage windows belong in the pane, not the band or status line.
+Subscribers see usage as points of the 5-hour window (`formatImpact`), never dollars; dollars appear only where there are no usage windows (an API key). Route every user-facing cost through `formatImpact`. Show a cost only for what is true now (a cold cache, a switch or MCP change about to rewrite it), never a hypothetical "if cold" figure; the per-question cost is real (recent turns). Usage windows belong in the pane, not the band.
 
 ## Prices
 
@@ -68,4 +68,4 @@ Subscribers see usage as points of the 5-hour window (`formatImpact`), never dol
 
 ## Design
 
-The UI must stay calm: one dim line in the band above the prompt with the Details button, the same figures in the status line; alerts (model switch, MCP change) replace the band's line rather than adding one; colour only for the state marker (theme keys `success`, `warning`, `inactive`), whole minutes only (no seconds, no fast ticking), no animation, no extra toasts. Anything new goes in the pane, not the band. The pane keeps one large figure, shows at most one suggestion at a time, and puts secondary detail behind a toggle. SVG is drawn only where the surface has `Svg`; every chart needs a text fallback for the terminal.
+The UI must stay calm: one dim line in the band above the prompt with the Details button, no status line; alerts (model switch, MCP change) replace the band's line rather than adding one; colour only for the state marker (theme keys `success`, `warning`, `inactive`), whole minutes only (no seconds, no fast ticking), no animation, no extra toasts. Anything new goes in the pane, not the band. The pane keeps one large figure, shows at most one suggestion at a time, and puts secondary detail behind a toggle. SVG is drawn only where the surface has `Svg`; every chart needs a text fallback for the terminal.

@@ -10,12 +10,13 @@ Claude Code caches your conversation for a limited time, usually one hour. While
 contextwatch shows how much time is left, and when the cache has gone cold it says what the next message will cost, so you know before you send.
 
 ```text
-● Cache warm · 55 min   [Details]
+● Cache warm · 55 min · ~0.8% per question   [Details]
 ```
 
 ## Features
 
-- **Countdown**: minutes left before the cache lapses, above the prompt and in the status line. It updates every 30 seconds and never shows seconds, so it stays out of the way. Costs appear only when they apply: once the cache is cold, or a switch is about to rewrite it.
+- **Countdown**: minutes left before the cache lapses, above the prompt. It updates every 30 seconds and never shows seconds, so it stays out of the way. Costs appear only when they apply: once the cache is cold, or a switch is about to rewrite it.
+- **Cost per question**: what your recent questions cost on average, each the sum of its requests. It grows as the context grows, since every request re-reads the whole conversation; compacting resets it.
 - **Cold-send question**: send a message into a large cold cache and contextwatch asks first: send anyway, compact then send, or start fresh then send.
 - **Compact before you leave**: in the last ten minutes, a quiet grey tip compares compacting now with coming back to a cold cache, with a **Compact** button. A compaction reads the whole context, which is cheap only while it is still cached.
 - **Alerts in place**: after a model switch or an MCP change that will rewrite a warm cache, the line above the prompt turns amber and says so.
@@ -48,12 +49,11 @@ Answer `y` to add the marketplace, then choose a scope. The pane opens with your
 
 | Where | What you see |
 | --- | --- |
-| Above the prompt | `● Cache warm · 55 min` and a **Details** button that opens the pane |
+| Above the prompt | `● Cache warm · 55 min · ~0.8% per question` and a **Details** button that opens the pane |
 | Above the prompt, cooling | `● Cache cooling · 8 min · Leaving? Compact first` and a **Compact** button |
 | Above the prompt, cold | `○ Cache cold · next message rewrites 187k (+6%)` |
 | Above the prompt, after a model switch | `● Switched to Sonnet 5.5 · cache rewrite +3%` |
 | Above the prompt, after an MCP change | `● MCP changed (+github) · likely cache rewrite +6%` |
-| Status line | `cache 55 min`, or `cache cold · next message +6%` |
 | Pane (**Context**) | Minutes left, 5-hour and weekly usage with reset times, one suggestion, other models on request, session summary |
 
 | Command | Does |

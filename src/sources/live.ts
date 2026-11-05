@@ -17,19 +17,20 @@ export function watchLive(on: On) {
   on('turn.step', async function* ($, e, next) {
     const step = yield* next(e)
     if (e.agentId === undefined && step.usage !== null) {
-      await record($, step.usage)
+      await record($, step.usage, e.turnId)
     }
 
     return step
   })
 }
 
-export async function record($: EngineInterface, usage: TurnUsage) {
+export async function record($: EngineInterface, usage: TurnUsage, turnId?: string) {
   const at = await $.clock.now()
   const list = await read($, history)
   const prev = list.at(-1) ?? null
   const base = {
     at,
+    turnId,
     model: usage.model,
     inputTokens: usage.input_tokens,
     cacheReadTokens: usage.cache_read_input_tokens,

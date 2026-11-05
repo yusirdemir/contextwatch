@@ -1,6 +1,6 @@
 import type { Snapshot } from '../../types'
 import { contextTokens } from './metrics'
-import { isSameModel, modelLabel, promptCost, SWITCH_MODELS } from './pricing'
+import { isSameModel, modelLabel, promptCost, responseCost, SWITCH_MODELS } from './pricing'
 import { remainingMs } from './ttl'
 
 export type Option = {
@@ -63,4 +63,21 @@ export const switchOptions = (list: readonly Snapshot[], now: number): Option[] 
       cost: promptCost(model, context, warmTokens, ttl),
     }
   })
+}
+
+// What a question has cost lately: the average of the last few turns, each the
+// sum of its requests. It grows with the context, since every request re-reads it.
+export const questionCost = (list: readonly Snapshot[], turns = 3): number | null => {
+  const totals = new Map<string, number>()
+  for (const s of list) {
+    if (s.turnId === undefined) continue
+    const cost = responseCost(s)
+    if (cost === null) continue
+    totals.set(s.turnId, (totals.get(s.turnId) ?? 0) + cost)
+  }
+
+  const recent = [...totals.values()].slice(-turns)
+  if (recent.length === 0) return null
+
+  return recent.reduce((a, b) => a + b, 0) / recent.length
 }

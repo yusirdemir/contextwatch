@@ -53,6 +53,10 @@ The live usage figures do not say which TTL an entry was written with. contextwa
 
 A miss right after a model change says nothing about the TTL and is ignored.
 
+## Cost per question
+
+Every request of a turn is recorded with its `turnId`. A question's cost is the sum of its requests at list price; the band shows the average of the last three, as points of the 5-hour window (or dollars with an API key). Each request re-reads the whole context from the cache, so the figure grows as the conversation grows and drops after a compaction.
+
 ## Explaining a miss
 
 `/contextwatch why` checks, in order:
@@ -140,7 +144,7 @@ When `awayReminder` is on, the tick sends one notice per response once the time 
 
 ## Redrawing
 
-A 30-second ticker writes the engine clock to `contextwatch.now` in session state, and refreshes the session total and the active model. The band and the pane read these values, so they redraw on each tick and after every turn. The UI shows whole minutes only, so a slower tick changes nothing you can see.
+A 30-second ticker writes the engine clock to `contextwatch.now` in session state, and refreshes the session total, usage windows and active model. The band and the pane read these values, so they redraw on each tick and after every turn. The UI shows whole minutes only, so a slower tick changes nothing you can see.
 
 ## Pane layout
 

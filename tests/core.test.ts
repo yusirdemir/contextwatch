@@ -4,10 +4,10 @@ import type { Snapshot } from '../types'
 import { compactAdvice } from '../src/core/compact'
 import { explainLast } from '../src/core/explain'
 import { cacheDropped, contextTokens, formatTokens, hitRate } from '../src/core/metrics'
-import { stayCost, switchOptions } from '../src/core/forecast'
+import { questionCost, stayCost, switchOptions } from '../src/core/forecast'
 import { formatUsd, modelLabel, priceOf, promptCost, responseCost } from '../src/core/pricing'
 import { diffServers, formatChange, serversOf } from '../src/core/tools'
-import { calibrate, formatImpact, formatUntil, parseLimits } from '../src/core/usage'
+import { calibrate, formatImpact, formatPerQuestion, formatUntil, parseLimits } from '../src/core/usage'
 import { formatAgo, formatMinutes, inferTtl, remainingMs, warmth } from '../src/core/ttl'
 
 const MIN = 60_000
@@ -199,4 +199,18 @@ test('usage windows and what a dollar moves them', () => {
 
   expect(formatUntil(80 * MIN, 0)).toBe('1 h 20 min')
   expect(formatUntil(3 * 24 * 60 * MIN + 4 * 60 * MIN, 0)).toBe('3 d 4 h')
+})
+
+test('a question costs the sum of its requests, averaged over recent turns', () => {
+  const one = responseCost(snap())!
+  // Turn a took two requests, turn b one: average (2 + 1) / 2 requests' worth.
+  const list = [snap({ turnId: 'a' }), snap({ turnId: 'a' }), snap({ turnId: 'b' })]
+  expect(near(questionCost(list), (one * 3) / 2)).toBe(true)
+  // Only the last three turns count.
+  const many = ['a', 'b', 'c', 'd'].map(turnId => snap({ turnId }))
+  expect(near(questionCost([snap({ turnId: 'z', cacheReadTokens: 900_000 }), ...many]), one)).toBe(true)
+  expect(questionCost([snap()])).toBeNull()
+
+  expect(formatPerQuestion('+0.8%')).toBe('~0.8% per question')
+  expect(formatPerQuestion('~$0.31')).toBe('~$0.31 per question')
 })

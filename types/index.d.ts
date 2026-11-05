@@ -8,6 +8,8 @@ export type TtlSource = 'default' | 'observed'
 // One main-thread API response.
 export type Snapshot = {
   at: number
+  // The turn this request belonged to: one question can take several requests.
+  turnId?: string
   model: string
   ttl: Ttl
   ttlSource: TtlSource
