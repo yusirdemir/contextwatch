@@ -19,7 +19,7 @@ contextwatch is a Claude Code mod (a plugin with a hooks module) that shows how 
 | Path | Role |
 | --- | --- |
 | `hooks/register.tsx` | Entry point. Wires features together and runs the one-second ticker |
-| `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), `compact.ts` (compact-now advice), formatting |
+| `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), `compact.ts` (compact-now advice), `usage.ts` (usage windows, the learned points-per-dollar ratio, impact formatting), formatting |
 | `src/sources/live.ts` | Turns `turn.step` usage into a `Snapshot` and stores it |
 | `src/sources/tools.ts` | MCP servers behind the current tool list |
 | `src/sources/compact.ts` | Learns compaction sizes from `session.compact`; the Compact button's call |
@@ -27,7 +27,7 @@ contextwatch is a Claude Code mod (a plugin with a hooks module) that shows how 
 | `src/commands.ts` | `/contextwatch` and `/contextwatch why` |
 | `src/guards.ts` | Model switch confirmation, away reminder, MCP change check |
 | `src/options.ts` | Reads the `userConfig` options declared in `plugin.json` |
-| `types/index.d.ts` | `$.state` contract: `history`, `now`, `sessionUsd`, `activeModel`, `toolBaseline`, `toolChange`, `lastCompactAt`, `compactStats`, `showModels` under `contextwatch` |
+| `types/index.d.ts` | `$.state` contract: `history`, `now`, `sessionUsd`, `activeModel`, `toolBaseline`, `toolChange`, `lastCompactAt`, `compactStats`, `limits`, `calibration`, `showModels` under `contextwatch` |
 | `tests/` | `core.test.ts` (pure logic), `plugin.test.tsx` (engine and UI) |
 | `docs/` | How it works, and every field the mod reads |
 
@@ -55,6 +55,10 @@ npx tsc -p .
 ```
 
 `tsc` needs `.claude-plugin/types/`, which the engine writes when it first loads the mod (`claude --plugin-dir .`). The API reference is `.claude-plugin/types/claude-code/index.d.ts`; search it for an event or noun name rather than guessing a signature.
+
+## Units
+
+Subscribers see usage as points of the 5-hour window (`formatImpact`), never dollars; dollars appear only where there are no usage windows (an API key). Route every user-facing cost through `formatImpact`.
 
 ## Prices
 

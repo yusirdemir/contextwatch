@@ -1,7 +1,8 @@
 import type { EngineInterface, Register, Timer } from 'claude-code'
-import { atom, update } from 'claude-code'
+import { atom, read, update } from 'claude-code'
 
 import { answerCommand, registerCommand } from '../src/commands'
+import { calibrate, parseLimits } from '../src/core/usage'
 import { guardModelSwitch, watchAway } from '../src/guards'
 import type { Options } from '../src/options'
 import { readOptions } from '../src/options'
@@ -14,6 +15,11 @@ import { showStatus } from '../src/ui/status'
 const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
 const sessionUsd = atom({ plugin: 'contextwatch', key: 'sessionUsd' } as const, null)
 const activeModel = atom({ plugin: 'contextwatch', key: 'activeModel' } as const, null)
+const limits = atom({ plugin: 'contextwatch', key: 'limits' } as const, null)
+const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null })
+
+// The learned ratio outlives the session: the subscription's windows do not change with it.
+const STORE_RATIO = 'percentPerUsd'
 
 // Minutes are all the UI shows, so a slow tick keeps it calm.
 const TICK_MS = 30_000
@@ -26,6 +32,7 @@ export const register: Register = (on, raw) => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await registerCommand($)
+    await loadRatio($)
     await tick($, options)
     ticker?.cancel()
     ticker = $.clock.every(TICK_MS, () => void tick($, options))
@@ -63,9 +70,18 @@ async function refresh($: EngineInterface) {
   try {
     const usage = await $.session.usage()
     const usd = usage.cost?.usd ?? null
+    const windows = parseLimits(usage.rateLimits)
     await update($, sessionUsd, () => usd)
+    await update($, limits, () => windows)
+
+    const before = await read($, calibration)
+    const after = calibrate(before, usd, windows)
+    await update($, calibration, () => after)
+    if (after.percentPerUsd !== null && after.percentPerUsd !== before.percentPerUsd) {
+      await $.store.set(STORE_RATIO, after.percentPerUsd)
+    }
   } catch {
-    // Hosts without a cost ledger leave the total out.
+    // Hosts without a cost ledger or usage windows leave these out.
   }
 
   try {
@@ -73,5 +89,16 @@ async function refresh($: EngineInterface) {
     await update($, activeModel, () => model)
   } catch {
     // Without it the band cannot warn about a switch; nothing else depends on it.
+  }
+}
+
+async function loadRatio($: EngineInterface) {
+  try {
+    const stored = await $.store.get(STORE_RATIO)
+    if (typeof stored === 'number' && stored > 0) {
+      await update($, calibration, cal => (cal.percentPerUsd === null ? { ...cal, percentPerUsd: stored } : cal))
+    }
+  } catch {
+    // Without the store the ratio is learned again in this session.
   }
 }

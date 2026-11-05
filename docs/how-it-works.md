@@ -86,6 +86,20 @@ These figures cover the context alone. The new message and the answer are added 
 
 The session total in the pane is Claude Code's own figure (`$.session.usage().cost.usd`, the same as `/cost`), not an estimate.
 
+## Usage limits
+
+On a Pro or Max subscription, `$.session.usage().rateLimits` reports the `five_hour` and `seven_day` windows: how full each is (0 to 100, one decimal) and when it resets. It does not say how much one message uses.
+
+contextwatch learns that from the session itself. It keeps an anchor (session cost and 5-hour percentage); once the window has moved at least one point, it takes `points ÷ dollars` as a sample and folds it into a running estimate (30% weight for each new sample). A window reset, or a drop in either figure, starts a new anchor. The estimate is saved in the plugin's store, so a new session starts with it.
+
+```text
+impact of a cold cache = cold rewrite (list price) × points per dollar
+```
+
+The pane draws that impact as a faint segment past the 5-hour fill. Until the first sample, the `+%` figures are left out. Other sessions using the same account at the same time move the window too, which makes the estimate high rather than low.
+
+With an API key there are no windows; contextwatch shows dollars instead.
+
 ## Compact before you leave
 
 A compaction sends the whole conversation to the model and gets a summary back. While the cache is warm, that read is a cache read; once it is cold, it is a full rewrite. So the cheapest moment to compact is just before stepping away.

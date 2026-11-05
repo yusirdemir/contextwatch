@@ -1,13 +1,14 @@
 import type { Color, On } from 'claude-code'
 import { atom, read } from 'claude-code'
 
-import type { CompactStats, Snapshot, ToolChange } from '../../types'
+import type { Calibration, CompactStats, Limits, Snapshot, ToolChange } from '../../types'
 import { compactAdvice } from '../core/compact'
 import { stayCost, switchOptions } from '../core/forecast'
 import { contextTokens, formatTokens } from '../core/metrics'
-import { formatUsd, isSameModel, modelLabel } from '../core/pricing'
+import { isSameModel, modelLabel } from '../core/pricing'
 import { formatChange } from '../core/tools'
 import { formatMinutes, remainingMs, warmth } from '../core/ttl'
+import { formatImpact, formatPercentUsed } from '../core/usage'
 import { compactNow } from '../sources/compact'
 import { openPane } from './pane'
 import { COLOR, DOT } from './theme'
@@ -17,9 +18,21 @@ const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
 const activeModel = atom({ plugin: 'contextwatch', key: 'activeModel' } as const, null)
 const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, null)
 const compactStats = atom({ plugin: 'contextwatch', key: 'compactStats' } as const, null)
+const limits = atom({ plugin: 'contextwatch', key: 'limits' } as const, null)
+const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null })
 
 // `tip` is the quiet suggestion drawn after the line; `canCompact` adds its button.
 type Line = { dot: string; color: Color; words: string; tip?: string; canCompact?: boolean }
+
+type Inputs = {
+  list: Snapshot[]
+  time: number
+  model: string | null
+  change: ToolChange | null
+  stats: CompactStats | null
+  windows: Limits | null
+  cal: Calibration
+}
 
 // One quiet line above the prompt with the Details button. An alert that
 // needs a decision before sending (a model switch, an MCP change) takes its place.
@@ -28,7 +41,15 @@ export function registerBand(on: On) {
     const list = await read($, history)
     if (e.props.hasSurvey || list.length === 0) return next(e)
 
-    const line = lineFor(list, await read($, now), await read($, activeModel), await read($, toolChange), await read($, compactStats))
+    const line = lineFor({
+      list,
+      time: await read($, now),
+      model: await read($, activeModel),
+      change: await read($, toolChange),
+      stats: await read($, compactStats),
+      windows: await read($, limits),
+      cal: await read($, calibration),
+    })
     const { Box, Button, Text } = $.ui.resolve(e)
 
     return (
@@ -45,47 +66,46 @@ export function registerBand(on: On) {
   })
 }
 
-const price = (cost: number | null) => (cost === null ? '' : ` ~${formatUsd(cost)}`)
+// " · +6% if cold", or nothing while the impact is unknown.
+const part = (impact: string | null, suffix = '') => (impact === null ? '' : ` · ${impact}${suffix}`)
 
-const lineFor = (
-  list: Snapshot[],
-  time: number,
-  model: string | null,
-  change: ToolChange | null,
-  stats: CompactStats | null,
-): Line => {
+// " +6%" straight after the words it measures.
+const after = (impact: string | null) => (impact === null ? '' : ` ${impact}`)
+
+const lineFor = ({ list, time, model, change, stats, windows, cal }: Inputs): Line => {
   const last = list.at(-1)!
   const state = warmth(last, time)
   const tokens = formatTokens(contextTokens(last))
-  const cost = stayCost(list, time)
+  const cold = formatImpact(stayCost(list, time).cold, windows, cal)
 
   if (state !== 'cold' && model !== null && !isSameModel(model, last.model)) {
-    const switchCost = switchOptions(list, time).find(o => isSameModel(o.model, model))?.cost ?? null
+    const cost = switchOptions(list, time).find(o => isSameModel(o.model, model))?.cost ?? null
 
-    return { dot: '●', color: 'warning', words: `Switched to ${modelLabel(model)} · cache rewrite${price(switchCost)}` }
+    return { dot: '●', color: 'warning', words: `Switched to ${modelLabel(model)} · cache rewrite${after(formatImpact(cost, windows, cal))}` }
   }
 
   if (state !== 'cold' && change !== null) {
-    return { dot: '●', color: 'warning', words: `MCP changed (${formatChange(change)}) · likely cache rewrite${price(cost.cold)}` }
+    return { dot: '●', color: 'warning', words: `MCP changed (${formatChange(change)}) · likely cache rewrite${after(cold)}` }
   }
+
+  const usage = windows?.fiveHour == null ? '' : ` · 5h ${formatPercentUsed(windows.fiveHour.percent)}`
 
   if (state === 'cold') {
-    return { dot: DOT.cold, color: COLOR.cold, words: `Cache cold · next message${price(cost.cold)} (${tokens} rewrite)` }
+    return { dot: DOT.cold, color: COLOR.cold, words: `Cache cold${usage} · next message rewrites ${tokens}${cold === null ? '' : ` (${cold})`}` }
   }
 
-  const nowPart = cost.warm === null ? '' : ` · ${formatUsd(cost.warm)} now`
-  const coldPart = cost.cold === null ? '' : ` · ${formatUsd(cost.cold)} if cold`
-
-  const words = `Cache ${formatMinutes(remainingMs(last, time))}${nowPart}${coldPart}`
+  const words = `Cache ${formatMinutes(remainingMs(last, time))}${usage}${part(cold, ' if cold')}`
 
   // Cooling is the moment to compact: reading the context is still cheap.
   const advice = state === 'cooling' ? compactAdvice(list, time, stats) : null
   if (advice !== null) {
+    const back = formatImpact(advice.backCold, windows, cal)
+
     return {
       dot: DOT[state],
       color: COLOR[state],
       words,
-      tip: `Leaving? Compact first, come back for${price(advice.backCold)}`,
+      tip: back === null ? 'Leaving? Compact first' : `Leaving? Compact first, come back for ${back}`,
       canCompact: true,
     }
   }

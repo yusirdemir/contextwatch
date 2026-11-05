@@ -6,6 +6,7 @@ import { contextTokens, formatTokens } from './core/metrics'
 import { formatUsd, modelLabel, promptCost } from './core/pricing'
 import { diffServers, formatChange } from './core/tools'
 import { formatMinutes, remainingMs, TTL_MS } from './core/ttl'
+import { formatImpact } from './core/usage'
 import type { Options } from './options'
 import { currentServers } from './sources/tools'
 
@@ -13,6 +14,8 @@ const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const toolBaseline = atom({ plugin: 'contextwatch', key: 'toolBaseline' } as const, null)
 const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, null)
 const compactStats = atom({ plugin: 'contextwatch', key: 'compactStats' } as const, null)
+const limits = atom({ plugin: 'contextwatch', key: 'limits' } as const, null)
+const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null })
 
 // Asks before a model switch that would throw away a warm cache for more
 // than the configured amount. The engine prices the rewrite itself.
@@ -23,12 +26,11 @@ export function guardModelSwitch(on: On, options: Options) {
 
     const last = (await read($, history)).at(-1)
     const left = last === undefined ? '' : ` The ${modelLabel(e.from_model)} cache has ${formatMinutes(remainingMs(last, await $.clock.now()))} left.`
+    const impact = formatImpact(e.estimated_cache_write_usd, await read($, limits), await read($, calibration)) ?? `~${formatUsd(e.estimated_cache_write_usd)}`
 
     return {
       permissionDecision: 'ask' as const,
-      permissionDecisionReason:
-        `Switching to ${modelLabel(e.to_model)} rewrites ${formatTokens(e.context_tokens)} tokens of context ` +
-        `(~${formatUsd(e.estimated_cache_write_usd)}).${left}`,
+      permissionDecisionReason: `Switching to ${modelLabel(e.to_model)} rewrites ${formatTokens(e.context_tokens)} tokens of context (${impact}).${left}`,
     }
   }).catch(($, e, next) => next(e))
 }
@@ -46,10 +48,13 @@ export async function watchAway($: EngineInterface, options: Options, time: numb
 
   if (options.awayReminder && left > 0 && left <= options.awayReminderMinutes * 60_000 && remindedFor !== last.at) {
     remindedFor = last.at
-    const cost = promptCost(last.model, contextTokens(last), 0, last.ttl)
-    const price = cost === null ? '' : ` (~${formatUsd(cost)})`
+    const windows = await read($, limits)
+    const cal = await read($, calibration)
+    const cold = formatImpact(promptCost(last.model, contextTokens(last), 0, last.ttl), windows, cal)
+    const price = cold === null ? '' : ` (${cold})`
     const advice = compactAdvice(await read($, history), time, await read($, compactStats))
-    const tip = advice === null ? '' : ` Or compact now (~${formatUsd(advice.compactNow)}) and come back for ~${formatUsd(advice.backCold)}.`
+    const back = advice === null ? null : formatImpact(advice.backCold, windows, cal)
+    const tip = advice === null ? '' : back === null ? ' Or compact now, while it is cheap.' : ` Or compact now and come back for ${back}.`
     await say($, `Cache cools in ${formatMinutes(left)}. Send a message to keep ${formatTokens(contextTokens(last))} tokens warm; otherwise the next one rewrites them${price}.${tip}`)
   }
 
@@ -62,8 +67,8 @@ export async function watchAway($: EngineInterface, options: Options, time: numb
   const key = change === null ? undefined : `${last.at}:${formatChange(change)}`
   if (change !== null && left > 0 && left < TTL_MS[last.ttl] && key !== warnedChange) {
     warnedChange = key
-    const cost = promptCost(last.model, contextTokens(last), 0, last.ttl)
-    const price = cost === null ? '' : ` (~${formatUsd(cost)})`
+    const impact = formatImpact(promptCost(last.model, contextTokens(last), 0, last.ttl), await read($, limits), await read($, calibration))
+    const price = impact === null ? '' : ` (${impact})`
     $.ui.toast(`MCP servers changed (${formatChange(change)}): the next message likely rewrites the cache${price}.`)
   }
 }

@@ -20,6 +20,15 @@ export type Snapshot = {
 // What compactions of this session came to; used to price the next one.
 export type CompactStats = { tokensAfter: number; outputTokens: number }
 
+// One usage window of a subscription: how full it is and when it resets.
+export type LimitWindow = { percent: number; resetsAt: number | null }
+
+export type Limits = { fiveHour: LimitWindow | null; weekly: LimitWindow | null }
+
+// How many points of the 5-hour window a dollar of list price moves, learned
+// from the session's own spend; `anchor` is where the current sample started.
+export type Calibration = { anchor: { usd: number; percent: number } | null; percentPerUsd: number | null }
+
 // MCP servers connected or dropped since the last response.
 export type ToolChange = { added: string[]; removed: string[] }
 
@@ -38,6 +47,9 @@ declare module 'claude-code' {
       // The last compaction of the main conversation: when, and what it came to.
       lastCompactAt: number | null
       compactStats: CompactStats | null
+      // The subscription's usage windows; null with an API key.
+      limits: Limits | null
+      calibration: Calibration
       // Whether the pane's model comparison is open.
       showModels: boolean
     }

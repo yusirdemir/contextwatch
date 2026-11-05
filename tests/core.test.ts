@@ -7,6 +7,7 @@ import { cacheDropped, contextTokens, formatTokens, hitRate } from '../src/core/
 import { stayCost, switchOptions } from '../src/core/forecast'
 import { formatUsd, modelLabel, priceOf, promptCost, responseCost } from '../src/core/pricing'
 import { diffServers, formatChange, serversOf } from '../src/core/tools'
+import { calibrate, formatImpact, formatUntil, parseLimits } from '../src/core/usage'
 import { formatAgo, formatMinutes, inferTtl, remainingMs, warmth } from '../src/core/ttl'
 
 const MIN = 60_000
@@ -168,4 +169,34 @@ test('compacting while warm beats coming back to a cold cache', () => {
 test('a miss after a compaction is explained as the compaction', () => {
   const miss = { cacheReadTokens: 0, cacheCreationTokens: 20_000 }
   expect(explainLast([snap(), snap({ at: 2 * MIN, ...miss })], MIN)).toMatch(/compaction/)
+})
+
+test('usage windows and what a dollar moves them', () => {
+  const limits = parseLimits([
+    { kind: 'five_hour', percentUsed: 40, resetsAt: '1970-01-01T01:20:00Z' },
+    { kind: 'seven_day', percentUsed: 20 },
+  ])
+  expect(limits?.fiveHour).toEqual({ percent: 40, resetsAt: 80 * MIN })
+  expect(limits?.weekly?.resetsAt).toBeNull()
+  expect(parseLimits([])).toBeNull()
+
+  let cal = calibrate({ anchor: null, percentPerUsd: null }, 1, limits)
+  expect(cal.percentPerUsd).toBeNull()
+  // Half a point is too little to measure.
+  cal = calibrate(cal, 2, parseLimits([{ kind: 'five_hour', percentUsed: 40.5 }]))
+  expect(cal.percentPerUsd).toBeNull()
+  cal = calibrate(cal, 3, parseLimits([{ kind: 'five_hour', percentUsed: 44 }]))
+  expect(cal.percentPerUsd).toBe(2)
+  // A window reset starts a new sample instead of a negative one.
+  cal = calibrate(cal, 4, parseLimits([{ kind: 'five_hour', percentUsed: 1 }]))
+  expect(cal).toEqual({ anchor: { usd: 4, percent: 1 }, percentPerUsd: 2 })
+
+  expect(formatImpact(0.9, limits, cal)).toBe('+1.8%')
+  expect(formatImpact(9, limits, cal)).toBe('+18%')
+  expect(formatImpact(0.01, limits, cal)).toBe('<0.1%')
+  expect(formatImpact(0.9, limits, { anchor: null, percentPerUsd: null })).toBeNull()
+  expect(formatImpact(0.9, null, cal)).toBe('~$0.90')
+
+  expect(formatUntil(80 * MIN, 0)).toBe('1 h 20 min')
+  expect(formatUntil(3 * 24 * 60 * MIN + 4 * 60 * MIN, 0)).toBe('3 d 4 h')
 })

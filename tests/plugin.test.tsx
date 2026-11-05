@@ -18,7 +18,12 @@ const SUMMARY = [{ role: 'user' as const, text: 'Summary of the conversation so 
 let servers: string[] = []
 let notices: string[] = []
 
+// What `$.session.usage()` reports: the session's spend and, on a
+// subscription, how full the 5-hour and weekly windows are.
+type Usage = { usd: number; five?: number; week?: number }
+
 type EngineOptions = {
+  usage?: () => Usage
   model?: () => string
   onStatus?: (text: string | undefined) => void
   onCompact?: () => void
@@ -41,7 +46,15 @@ const engine = (on: On, options: EngineOptions = {}) => {
 
     return { value: undefined }
   })
-  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1_000_000 }, rateLimits: [], cost: { usd: 1.23 } } }))
+  on('session.usage', () => {
+    const u = options.usage?.() ?? { usd: 1.23, five: 40, week: 20 }
+    const rateLimits = [
+      ...(u.five === undefined ? [] : [{ kind: 'five_hour', percentUsed: u.five, resetsAt: new Date(80 * MIN).toISOString() }]),
+      ...(u.week === undefined ? [] : [{ kind: 'seven_day', percentUsed: u.week, resetsAt: new Date(3 * 24 * 60 * MIN).toISOString() }]),
+    ]
+
+    return { value: { startedAt: 0, context: { window: 1_000_000 }, rateLimits, cost: { usd: u.usd } } }
+  })
   on('session.model', () => ({ value: options.model?.() ?? 'claude-opus-5-5' }))
   on('session.compact', () => {
     options.onCompact?.()
@@ -92,12 +105,11 @@ test('a response starts the countdown', async ($, on) => {
 
   const ran = await $.command.run({ ...COMMAND, args: '' })
   expect(ran.text).toMatch(/48 min left/)
-  expect(ran.text).toMatch(/cache read ~\$0\.02/)
-  expect(ran.text).toMatch(/cache rewrite ~\$0\.9/)
+  expect(ran.text).toMatch(/5-hour 40% \(resets in 1 h 8 min\)/)
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const band = await $.ui.mount({ plugin: 'contextwatch', surface, component: 'AbovePrompt', props: { hasSurvey: false } as never })
-    expect((await band.find({ type: 'Text', text: /Cache 48 min/ }))?.text).toMatch(/\$0\.02 now · \$0\.91 if cold/)
+    expect((await band.find({ type: 'Text', text: /Cache 48 min/ }))?.text).toMatch(/Cache 48 min · 5h 40%/)
     expect(await band.find({ type: 'Button', key: 'details' })).toBeDefined()
     await band.unmount()
   }
@@ -126,7 +138,7 @@ test('the cache goes cold after its TTL', async ($, on) => {
   expect(ran.text).toMatch(/Cache cold/)
 })
 
-test('the pane shows the countdown, switch costs and the session total', async ($, on) => {
+test('the pane shows the countdown, the usage windows and the models on request', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
   engine(on)
 
@@ -150,7 +162,9 @@ test('the pane shows the countdown, switch costs and the session total', async (
       },
     })
     expect((await pane.find({ type: 'Text', text: /^55 min$/ }))?.text).toBe('55 min')
-    expect((await pane.find({ type: 'Text', text: /this session/ }))?.text).toMatch(/\$1\.23 this session/)
+    expect(await pane.find({ type: 'Text', text: /^5-hour$/ })).toBeDefined()
+    expect((await pane.find({ type: 'Text', text: /^40%$/ }))?.text).toBe('40%')
+    expect(await pane.find({ type: 'Text', text: /^Learning/ })).toBeDefined()
 
     // The model comparison stays closed until asked for.
     expect(await pane.find({ type: 'Text', text: /^Sonnet 5\.5/ })).toBeUndefined()
@@ -247,7 +261,7 @@ test('an MCP server change while warm is flagged in the band', async ($, on) => 
   await after.unmount()
 })
 
-test('the status line carries the countdown and both cache costs', async ($, on) => {
+test('the status line carries the countdown and both usage windows', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
   const lines: (string | undefined)[] = []
   engine(on, { onStatus: text => lines.push(text) })
@@ -256,7 +270,7 @@ test('the status line carries the countdown and both cache costs', async ($, on)
   await drain($.turn.step(STEP))
   await clock.advance(5 * MIN)
 
-  expect(lines.at(-1)).toBe('cache 55 min · $0.02 now · $0.91 if cold')
+  expect(lines.at(-1)).toBe('cache 55 min · 5h 40% · week 20%')
 })
 
 test('a model switch shows the line above the prompt', async ($, on) => {
@@ -270,7 +284,7 @@ test('a model switch shows the line above the prompt', async ($, on) => {
   await clock.advance(1 * MIN)
 
   const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
-  expect((await band.find({ type: 'Text', text: /Switched to/ }))?.text).toMatch(/Sonnet 5\.5 · cache rewrite ~\$/)
+  expect((await band.find({ type: 'Text', text: /Switched to/ }))?.text).toMatch(/^Switched to Sonnet 5\.5 · cache rewrite/)
   await band.unmount()
 })
 
@@ -290,7 +304,7 @@ test('while cooling the band suggests compacting, with a Compact button', async 
   // Eight minutes left: compacting now is cheap.
   await clock.advance(22 * MIN)
   band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
-  expect((await band.find({ type: 'Text', text: /Leaving\?/ }))?.text).toMatch(/Compact first, come back for ~\$0\.16/)
+  expect((await band.find({ type: 'Text', text: /Leaving\?/ }))?.text).toMatch(/Leaving\? Compact first/)
   expect(await band.find({ type: 'Button', key: 'compact' })).toBeDefined()
   await band.unmount()
 })
@@ -318,4 +332,37 @@ test('a compaction teaches its size and is not reported as a miss', async ($, on
   expect(toasts.filter(t => /cold/.test(t)).length).toBe(0)
   const why = await $.command.run({ ...COMMAND, args: 'why' })
   expect(why.text).toMatch(/compaction/)
+})
+
+test('the usage a cold cache would add is learned from the spend', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  let u: Usage = { usd: 1, five: 40, week: 20 }
+  engine(on, { usage: () => u })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await drain($.turn.step(STEP))
+
+  // Two dollars moved the 5-hour window four points: 2 points per dollar.
+  u = { usd: 3, five: 44, week: 21 }
+  await clock.advance(MIN)
+
+  // A cold rewrite of 113k tokens on Opus 5.5 is ~$0.91, so ~1.8 points.
+  const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
+  expect((await band.find({ type: 'Text', text: /Cache/ }))?.text).toMatch(/5h 44% · \+1\.8% if cold/)
+  await band.unmount()
+})
+
+test('with an API key, dollars stand in for usage', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const lines: (string | undefined)[] = []
+  engine(on, { usage: () => ({ usd: 1.23 }), onStatus: text => lines.push(text) })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await drain($.turn.step(STEP))
+  await clock.advance(5 * MIN)
+
+  expect(lines.at(-1)).toBe('cache 55 min · ~$0.91 if cold')
+  const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
+  expect((await band.find({ type: 'Text', text: /Cache/ }))?.text).toMatch(/Cache 55 min · ~\$0\.91 if cold/)
+  await band.unmount()
 })

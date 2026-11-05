@@ -10,7 +10,8 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 
 - Live cache countdown with read and cold costs in the status line, in whole minutes, updated every 30 seconds.
 - A line above the prompt with the countdown and a **Details** button; it turns into an alert after a model switch or MCP change that will rewrite a warm cache.
-- Cost of the next message with a warm and a cold cache, from Anthropic list prices.
+- 5-hour and weekly usage windows with reset times, in the pane, the band and the status line.
+- What a cold cache would add to the 5-hour window, learned from the session's own spend and drawn as a faint segment on the bar; dollars with an API key.
 - Cost of the first message after switching to each other model, and a warning in the band right after a switch.
 - Per-model cache tracking: a model used earlier in the session that is still warm is priced as a partial hit.
 - Confirmation before a model switch that would rewrite a warm cache for more than `confirmSwitchUsd` (default $0.50).
