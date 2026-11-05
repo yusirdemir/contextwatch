@@ -10,6 +10,7 @@ import { currentServers } from './tools'
 const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const toolBaseline = atom({ plugin: 'contextwatch', key: 'toolBaseline' } as const, null)
 const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, null)
+const lastCompactAt = atom({ plugin: 'contextwatch', key: 'lastCompactAt' } as const, null)
 
 // Records each main-thread response; subagents keep caches of their own.
 export function watchLive(on: On) {
@@ -44,7 +45,10 @@ export async function record($: EngineInterface, usage: TurnUsage) {
   await update($, toolBaseline, () => servers)
   await update($, toolChange, () => null)
 
-  if (prev !== null && cacheDropped(snapshot)) {
+  // A compaction rewrites the conversation, so the write after it is expected.
+  const compactedAt = await read($, lastCompactAt)
+  const isAfterCompact = prev !== null && compactedAt !== null && compactedAt > prev.at
+  if (prev !== null && cacheDropped(snapshot) && !isAfterCompact) {
     $.ui.toast(`Prompt cache was cold: ${formatTokens(snapshot.cacheCreationTokens)} tokens written again.`)
   }
 }

@@ -11,11 +11,19 @@ const usage: TurnUsage = {
   output_tokens: 100,
 }
 
+// A compaction leaves at least one message: its summary.
+const SUMMARY = [{ role: 'user' as const, text: 'Summary of the conversation so far.', toolUses: [] }]
+
 // What the stand-in engine reports: its MCP servers, and the notifications sent.
 let servers: string[] = []
 let notices: string[] = []
 
-type EngineOptions = { model?: () => string; onStatus?: (text: string | undefined) => void }
+type EngineOptions = {
+  model?: () => string
+  onStatus?: (text: string | undefined) => void
+  onCompact?: () => void
+  onToast?: (text: string) => void
+}
 
 // Stands for the engine: each model request is answered with `usage`.
 const engine = (on: On, options: EngineOptions = {}) => {
@@ -28,9 +36,18 @@ const engine = (on: On, options: EngineOptions = {}) => {
 
     return { value: undefined }
   })
-  on('ui.toast', () => ({ value: undefined }))
+  on('ui.toast', (_, e) => {
+    options.onToast?.(e.text)
+
+    return { value: undefined }
+  })
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1_000_000 }, rateLimits: [], cost: { usd: 1.23 } } }))
   on('session.model', () => ({ value: options.model?.() ?? 'claude-opus-5-5' }))
+  on('session.compact', () => {
+    options.onCompact?.()
+
+    return { messages: SUMMARY, tokensBefore: 113_402, tokensAfter: 15_000, usage: { ...usage, output_tokens: 6_000 } }
+  })
   // What the engine draws where the plugin draws nothing.
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
@@ -250,4 +267,50 @@ test('a model switch shows the line above the prompt', async ($, on) => {
   const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
   expect((await band.find({ type: 'Text', text: /Switched to/ }))?.text).toMatch(/Sonnet 5\.5 · cache rewrite 113k tokens/)
   await band.unmount()
+})
+
+test('while cooling the band suggests compacting, with a Compact button', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  engine(on)
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await drain($.turn.step(STEP))
+
+  // Warm: no suggestion yet.
+  await clock.advance(30 * MIN)
+  let band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
+  expect(await band.find({ type: 'Text', text: /Leaving\?/ })).toBeUndefined()
+  await band.unmount()
+
+  // Eight minutes left: compacting now is cheap.
+  await clock.advance(22 * MIN)
+  band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
+  expect((await band.find({ type: 'Text', text: /Leaving\?/ }))?.text).toMatch(/Compact now ~\$0\.22, come back for ~\$0\.16/)
+  expect(await band.find({ type: 'Button', key: 'compact' })).toBeDefined()
+  await band.unmount()
+})
+
+test('a compaction teaches its size and is not reported as a miss', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const toasts: string[] = []
+  let compacted = 0
+  engine(on, { onToast: text => toasts.push(text), onCompact: () => compacted++ })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await drain($.turn.step(STEP))
+  await clock.advance(MIN)
+  await $.session.compact({ trigger: 'manual', messages: SUMMARY })
+  expect(compacted).toBe(1)
+
+  // The next request writes the shorter context.
+  usage.cache_read_input_tokens = 0
+  usage.cache_creation_input_tokens = 15_000
+  await clock.advance(MIN)
+  await drain($.turn.step(STEP))
+  usage.cache_read_input_tokens = 113_000
+  usage.cache_creation_input_tokens = 300
+
+  expect(toasts.filter(t => /cold/.test(t)).length).toBe(0)
+  const why = await $.command.run({ ...COMMAND, args: 'why' })
+  expect(why.text).toMatch(/compaction/)
 })

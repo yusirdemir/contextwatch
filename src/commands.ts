@@ -10,6 +10,7 @@ import { openPane } from './ui/pane'
 
 const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
+const lastCompactAt = atom({ plugin: 'contextwatch', key: 'lastCompactAt' } as const, null)
 
 export async function registerCommand($: EngineInterface) {
   await $.command.register({
@@ -22,7 +23,7 @@ export async function registerCommand($: EngineInterface) {
 export function answerCommand(on: On) {
   on('command.run', { command: 'contextwatch' }, async ($, e) => {
     const list = await read($, history)
-    if (e.args.trim() === 'why') return { text: explainLast(list) }
+    if (e.args.trim() === 'why') return { text: explainLast(list, await read($, lastCompactAt)) }
 
     await openPane($)
     const last = list.at(-1)

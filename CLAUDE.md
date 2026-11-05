@@ -19,14 +19,15 @@ contextwatch is a Claude Code mod (a plugin with a hooks module) that shows how 
 | Path | Role |
 | --- | --- |
 | `hooks/register.tsx` | Entry point. Wires features together and runs the one-second ticker |
-| `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), formatting |
+| `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), `compact.ts` (compact-now advice), formatting |
 | `src/sources/live.ts` | Turns `turn.step` usage into a `Snapshot` and stores it |
 | `src/sources/tools.ts` | MCP servers behind the current tool list |
+| `src/sources/compact.ts` | Learns compaction sizes from `session.compact`; the Compact button's call |
 | `src/ui/` | Status line, band above the prompt, detail pane, theme, `charts.ts` (SVG and text charts) |
 | `src/commands.ts` | `/contextwatch` and `/contextwatch why` |
 | `src/guards.ts` | Model switch confirmation, away reminder, MCP change check |
 | `src/options.ts` | Reads the `userConfig` options declared in `plugin.json` |
-| `types/index.d.ts` | `$.state` contract: `history`, `now`, `sessionUsd`, `activeModel`, `toolBaseline`, `toolChange` under `contextwatch` |
+| `types/index.d.ts` | `$.state` contract: `history`, `now`, `sessionUsd`, `activeModel`, `toolBaseline`, `toolChange`, `lastCompactAt`, `compactStats` under `contextwatch` |
 | `tests/` | `core.test.ts` (pure logic), `plugin.test.tsx` (engine and UI) |
 | `docs/` | How it works, and every field the mod reads |
 
@@ -40,6 +41,7 @@ The validator enforces these; breaking one fails `claude plugin validate`.
 - `on('session.start')` may be registered only once without a matcher.
 - Never name a local variable `read` or `update`: it shadows the state functions and the validator rejects the module.
 - New settings go in `userConfig` in `plugin.json` and are parsed in `src/options.ts`; document them in the README's Settings table.
+- In tests, a `session.compact` call needs at least one message; argless `$.session.compact()` from the plugin cannot run there, so test the button's presence, not the press.
 - In tests, read a `turn.step` stream to its end before asserting; the engine stand-ins must answer `ui.status` and `ui.toast` with `{ value: undefined }`.
 
 ## Verify every change

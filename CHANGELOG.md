@@ -16,6 +16,8 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 - Confirmation before a model switch that would rewrite a warm cache for more than `confirmSwitchUsd` (default $0.50).
 - Warning when MCP servers change while the cache is warm.
 - Optional away reminder before the cache lapses (`awayReminder`, `awayReminderMinutes`).
+- Compact suggestion while the cache is cooling, with a Compact button, priced from the session's own compactions once there is one.
+- Writes after a compaction are no longer reported as misses; `/contextwatch why` names the compaction.
 - Detail pane with cost bars, a context growth chart with misses marked, hit rate and the session total.
 - Notice when a response had to write the cache again.
 - `/contextwatch` and `/contextwatch why` commands.

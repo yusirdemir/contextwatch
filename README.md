@@ -16,6 +16,7 @@ contextwatch shows how much time is left and what the next message costs, so you
 ## Features
 
 - **Countdown**: minutes left before the cache lapses, above the prompt and in the status line. It updates every 30 seconds and never shows seconds, so it stays out of the way.
+- **Compact before you leave**: in the last ten minutes, a quiet grey tip compares compacting now with coming back to a cold cache, with a **Compact** button. A compaction reads the whole context, which is cheap only while it is still cached.
 - **Alerts in place**: after a model switch or an MCP change that will rewrite a warm cache, the line above the prompt turns amber and says so.
 - **Cache cost**: what the context costs on the next message, as a cache read while warm and as a cache rewrite once cold.
 - **Model switch preview**: the cache cost of the first message on each other model, and a warning as soon as you switch.
@@ -47,6 +48,7 @@ Answer `y` to add the marketplace, then choose a scope. The pane opens with your
 | Where | What you see |
 | --- | --- |
 | Above the prompt | `● Cache 55 min left · cache read ~$0.06 · cold ~$2.55` and a **Details** button that opens the pane |
+| Above the prompt, cooling | `● Cache 8 min left · … · Leaving? Compact now ~$0.25, come back for ~$0.16` and a **Compact** button |
 | Above the prompt, cold | `○ Cache cold · rewrite 187k tokens ~$2.63` |
 | Above the prompt, after a model switch | `● Switched to Sonnet 5.5 · cache rewrite 187k tokens ~$0.75` |
 | Above the prompt, after an MCP change | `● MCP servers changed (+github) · likely cache rewrite ~$1.50` |

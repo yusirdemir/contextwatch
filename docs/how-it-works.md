@@ -86,6 +86,20 @@ These figures cover the context alone. The new message and the answer are added 
 
 The session total in the pane is Claude Code's own figure (`$.session.usage().cost.usd`, the same as `/cost`), not an estimate.
 
+## Compact before you leave
+
+A compaction sends the whole conversation to the model and gets a summary back. While the cache is warm, that read is a cache read; once it is cold, it is a full rewrite. So the cheapest moment to compact is just before stepping away.
+
+```text
+compact now     = context × cacheRead + summary × output
+come back cold  = after × input × write multiplier          after compacting
+                = context × input × write multiplier        without it
+```
+
+`summary` and `after` start at 10k and 20k tokens, typical of Claude Code compactions. After the session compacts once, contextwatch uses that compaction's own output and size (`session.compact` reports `tokensAfter` and its `usage`).
+
+The tip appears only while cooling, only for contexts of 60k tokens or more, and only when compacting comes out cheaper. A response right after a compaction writes the cache for the shorter context; that write is not reported as a miss, and `/contextwatch why` names the compaction.
+
 ## Guards
 
 ### Model switch confirmation

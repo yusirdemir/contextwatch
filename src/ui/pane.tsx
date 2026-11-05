@@ -1,11 +1,13 @@
 import type { EngineInterface, On } from 'claude-code'
 import { atom, read } from 'claude-code'
 
+import { compactAdvice } from '../core/compact'
 import { stayCost, switchOptions } from '../core/forecast'
 import { cacheDropped, contextTokens, formatPercent, formatTokens, hitRate } from '../core/metrics'
 import { formatUsd, modelLabel, PRICES_AS_OF } from '../core/pricing'
 import { formatChange } from '../core/tools'
 import { formatAgo, formatMinutes, remainingMs, TTL_MS, ttlLabel, warmth } from '../core/ttl'
+import { compactNow } from '../sources/compact'
 import { barSvg, barText, INK, sparklineSvg, sparklineText } from './charts'
 import { COLOR, DOT, INK_OF, LABEL } from './theme'
 
@@ -13,6 +15,7 @@ const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
 const sessionUsd = atom({ plugin: 'contextwatch', key: 'sessionUsd' } as const, null)
 const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, null)
+const compactStats = atom({ plugin: 'contextwatch', key: 'compactStats' } as const, null)
 
 export const PANE = 'contextwatch'
 
@@ -26,7 +29,7 @@ export async function openPane($: EngineInterface) {
 export function registerPane(on: On) {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const els = $.ui.resolve(e)
-    const { Box, Text } = els
+    const { Box, Button, Text } = els
     const list = await read($, history)
     const last = list.at(-1)
 
@@ -41,10 +44,12 @@ export function registerPane(on: On) {
     const time = await read($, now)
     const total = await read($, sessionUsd)
     const change = await read($, toolChange)
+    const stats = await read($, compactStats)
     const state = warmth(last, time)
     const left = remainingMs(last, time)
     const ttlNote = last.ttlSource === 'observed' ? 'seen in this session' : 'assumed'
     const stay = stayCost(list, time)
+    const advice = state === 'cold' ? null : compactAdvice(list, time, stats)
     const options = switchOptions(list, time)
     const costs = options.map(o => o.cost ?? 0).concat(stay.cold ?? 0)
     const maxCost = Math.max(...costs, 0.000001)
@@ -106,6 +111,22 @@ export function registerPane(on: On) {
             For the {formatTokens(contextTokens(last))} tokens already in context on {modelLabel(last.model)}. Your new message and the answer come on top.
           </Text>
         </Box>
+
+        {advice !== null && (
+          <Box flexDirection="column">
+            <Text weight="medium">Before you step away</Text>
+            {row('c-now', 'Compact now', formatUsd(advice.compactNow), bar('b-c-now', advice.compactNow / advice.stayCold, INK.warm))}
+            {row('c-back', 'Then come back cold', formatUsd(advice.backCold), bar('b-c-back', advice.backCold / advice.stayCold, INK.warm))}
+            {row('c-stay', 'Come back cold without it', formatUsd(advice.stayCold), bar('b-c-stay', 1, INK.muted))}
+            <Box flexDirection="row" alignItems="center" gap={1}>
+              <Button key="compact" label={`Compact now · saves ~${formatUsd(advice.saves)}`} variant="secondary" onPress={() => compactNow($)} />
+            </Box>
+            <Text dimColor size="caption">
+              A compaction reads the whole context, which is cheap only while it is cached.
+              {stats === null ? ' Sizes are typical until this session compacts once.' : ' Sizes come from this session’s last compaction.'}
+            </Text>
+          </Box>
+        )}
 
         <Box flexDirection="column">
           <Text weight="medium">Switch model</Text>

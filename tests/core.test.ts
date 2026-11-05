@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Snapshot } from '../types'
+import { compactAdvice } from '../src/core/compact'
 import { explainLast } from '../src/core/explain'
 import { cacheDropped, contextTokens, formatTokens, hitRate } from '../src/core/metrics'
 import { stayCost, switchOptions } from '../src/core/forecast'
@@ -143,4 +144,28 @@ test('MCP server changes are read from the tool list', () => {
   const change = diffServers(['github', 'jira'], ['github', 'slack'])
   expect(change).toEqual({ added: ['slack'], removed: ['jira'] })
   expect(formatChange(change!)).toBe('+slack −jira')
+})
+
+test('compacting while warm beats coming back to a cold cache', () => {
+  const list = [snap({ at: 0 })]
+  const advice = compactAdvice(list, 52 * MIN, null)
+
+  // Read 100k from cache, write a ~10k summary at the output price.
+  expect(near(advice?.compactNow, 100_402 * 0.2 / 1e6 + 10_000 * 20 / 1e6)).toBe(true)
+  // Come back to ~20k cold instead of 100k cold.
+  expect(near(advice?.backCold, 20_000 * 4 * 2 / 1e6)).toBe(true)
+  expect(near(advice?.stayCold, 100_402 * 4 * 2 / 1e6)).toBe(true)
+  expect(advice!.saves).toBeGreaterThan(0.4)
+
+  // What the session's own compaction came to replaces the defaults.
+  const learned = compactAdvice(list, 52 * MIN, { tokensAfter: 40_000, outputTokens: 4_000 })
+  expect(near(learned?.backCold, 40_000 * 4 * 2 / 1e6)).toBe(true)
+
+  // Too small to be worth it.
+  expect(compactAdvice([snap({ cacheReadTokens: 30_000 })], 52 * MIN, null)).toBeNull()
+})
+
+test('a miss after a compaction is explained as the compaction', () => {
+  const miss = { cacheReadTokens: 0, cacheCreationTokens: 20_000 }
+  expect(explainLast([snap(), snap({ at: 2 * MIN, ...miss })], MIN)).toMatch(/compaction/)
 })

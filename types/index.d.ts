@@ -17,6 +17,9 @@ export type Snapshot = {
   outputTokens: number
 }
 
+// What compactions of this session came to; used to price the next one.
+export type CompactStats = { tokensAfter: number; outputTokens: number }
+
 // MCP servers connected or dropped since the last response.
 export type ToolChange = { added: string[]; removed: string[] }
 
@@ -32,6 +35,9 @@ declare module 'claude-code' {
       // MCP servers at the last response; null before the first.
       toolBaseline: string[] | null
       toolChange: ToolChange | null
+      // The last compaction of the main conversation: when, and what it came to.
+      lastCompactAt: number | null
+      compactStats: CompactStats | null
     }
   }
 }

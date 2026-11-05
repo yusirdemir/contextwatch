@@ -1,6 +1,7 @@
 import type { EngineInterface, On } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
+import { compactAdvice } from './core/compact'
 import { contextTokens, formatTokens } from './core/metrics'
 import { formatUsd, modelLabel, promptCost } from './core/pricing'
 import { diffServers, formatChange } from './core/tools'
@@ -11,6 +12,7 @@ import { currentServers } from './sources/tools'
 const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const toolBaseline = atom({ plugin: 'contextwatch', key: 'toolBaseline' } as const, null)
 const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, null)
+const compactStats = atom({ plugin: 'contextwatch', key: 'compactStats' } as const, null)
 
 // Asks before a model switch that would throw away a warm cache for more
 // than the configured amount. The engine prices the rewrite itself.
@@ -46,7 +48,9 @@ export async function watchAway($: EngineInterface, options: Options, time: numb
     remindedFor = last.at
     const cost = promptCost(last.model, contextTokens(last), 0, last.ttl)
     const price = cost === null ? '' : ` (~${formatUsd(cost)})`
-    await say($, `Cache cools in ${formatMinutes(left)}. Send a message to keep ${formatTokens(contextTokens(last))} tokens warm; otherwise the next one rewrites them${price}.`)
+    const advice = compactAdvice(await read($, history), time, await read($, compactStats))
+    const tip = advice === null ? '' : ` Or compact now (~${formatUsd(advice.compactNow)}) and come back for ~${formatUsd(advice.backCold)}.`
+    await say($, `Cache cools in ${formatMinutes(left)}. Send a message to keep ${formatTokens(contextTokens(last))} tokens warm; otherwise the next one rewrites them${price}.${tip}`)
   }
 
   const baseline = await read($, toolBaseline)
