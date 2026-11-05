@@ -6,6 +6,10 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The countdown starts when a request starts, not when its answer ends; long answers no longer make it read a few minutes high.
+
 ### Added
 
 - Live cache countdown with read and cold costs in the status line, in whole minutes, updated every 30 seconds.

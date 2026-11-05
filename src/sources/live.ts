@@ -15,17 +15,20 @@ const lastCompactAt = atom({ plugin: 'contextwatch', key: 'lastCompactAt' } as c
 // Records each main-thread response; subagents keep caches of their own.
 export function watchLive(on: On) {
   on('turn.step', async function* ($, e, next) {
+    // The cache entry's lifetime counts from the start of the request, not
+    // from when the answer finishes: a long answer eats into it.
+    const startedAt = await $.clock.now()
     const step = yield* next(e)
     if (e.agentId === undefined && step.usage !== null) {
-      await record($, step.usage, e.turnId)
+      await record($, step.usage, e.turnId, startedAt)
     }
 
     return step
   })
 }
 
-export async function record($: EngineInterface, usage: TurnUsage, turnId?: string) {
-  const at = await $.clock.now()
+export async function record($: EngineInterface, usage: TurnUsage, turnId?: string, startedAt?: number) {
+  const at = startedAt ?? (await $.clock.now())
   const list = await read($, history)
   const prev = list.at(-1) ?? null
   const base = {

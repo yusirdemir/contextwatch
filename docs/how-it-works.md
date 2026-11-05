@@ -20,7 +20,7 @@ On every `turn.step` event of the main conversation, contextwatch stores a snaps
 
 | Field | From |
 | --- | --- |
-| `at` | The engine clock when the response arrived |
+| `at` | The engine clock when the request started: the cache entry's lifetime counts from the start of the request, so a long answer eats into it |
 | `model` | `usage.model` |
 | `inputTokens` | `usage.input_tokens` |
 | `cacheReadTokens` | `usage.cache_read_input_tokens` |

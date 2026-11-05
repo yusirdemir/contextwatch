@@ -33,6 +33,8 @@ type EngineOptions = {
   onSubmit?: (text: string) => void
   onClear?: () => void
   onFill?: (text: string) => void
+  // Runs before each model request answers: how long the answer takes.
+  answering?: () => Promise<void>
 }
 
 // Stands for the engine: each model request is answered with `usage`.
@@ -107,6 +109,8 @@ const engine = (on: On, options: EngineOptions = {}) => {
   })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('turn.step', async function* (_, e) {
+    await options.answering?.()
+
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn' as const, usage }
   })
 }
@@ -489,4 +493,19 @@ test('the question can be turned off', { options: { askWhenCold: false } }, asyn
   await clock.advance(61 * MIN)
   await $.prompt.submit(PROMPT)
   expect(sent.length).toBe(1)
+})
+
+test('the countdown starts when the request starts, not when the answer ends', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  // A four-minute answer.
+  engine(on, { answering: () => clock.sleep(4 * MIN) })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  const step = drain($.turn.step(STEP))
+  await clock.advance(4 * MIN)
+  await step
+
+  const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
+  expect((await band.find({ type: 'Text', text: /^Cache/ }))?.text).toMatch(/Cache warm · 56 min/)
+  await band.unmount()
 })

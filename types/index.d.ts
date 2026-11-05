@@ -7,6 +7,7 @@ export type TtlSource = 'default' | 'observed'
 
 // One main-thread API response.
 export type Snapshot = {
+  // When the request started: the cache entry's lifetime counts from here.
   at: number
   // The turn this request belonged to: one question can take several requests.
   turnId?: string
