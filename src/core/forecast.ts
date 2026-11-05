@@ -70,12 +70,23 @@ export const switchOptions = (list: readonly Snapshot[], now: number): Option[] 
 // joined the context after it was cached, is written, as is the message being
 // typed (`draftTokens`). Cold, all of it is written. Tool calls and the
 // answer come on top.
-export const floorCost = (list: readonly Snapshot[], now: number, draftTokens = 0): number | null => {
+export const floorCost = (list: readonly Snapshot[], now: number, draftTokens = 0): number | null =>
+  nextBreakdown(list, now, draftTokens)?.total ?? null
+
+// The next message in two parts: what is read from the cache and what is
+// written to it, in tokens and dollars. The pane draws the dollars as a bar.
+export type Breakdown = { readTokens: number; writeTokens: number; readUsd: number; writeUsd: number; total: number }
+
+export const nextBreakdown = (list: readonly Snapshot[], now: number, draftTokens = 0): Breakdown | null => {
   const last = list.at(-1)
   if (last === undefined) return null
 
-  const context = contextTokens(last)
-  const cached = remainingMs(last, now) > 0 ? context - last.outputTokens : 0
+  const context = contextTokens(last) + draftTokens
+  const readTokens = remainingMs(last, now) > 0 ? contextTokens(last) - last.outputTokens : 0
+  const writeTokens = context - readTokens
+  const readUsd = promptCost(last.model, readTokens, readTokens, last.ttl)
+  const writeUsd = promptCost(last.model, writeTokens, 0, last.ttl)
+  if (readUsd === null || writeUsd === null) return null
 
-  return promptCost(last.model, context + draftTokens, cached, last.ttl)
+  return { readTokens, writeTokens, readUsd, writeUsd, total: readUsd + writeUsd }
 }

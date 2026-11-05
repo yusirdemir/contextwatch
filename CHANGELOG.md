@@ -22,6 +22,7 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 - Next message in the band (`next message +0.7%`): worked out from the context, the cache and the message being typed (estimated tokens), not an average of past questions. The pane shows where the 5-hour window lands (`41% → 42%`) as a faint segment on the bar.
 - The status line is gone; the band above the prompt carries the countdown.
 - Band shows the cache state only; a cost appears once the cache is cold or a switch will rewrite it. Usage windows live in the pane.
+- The pane's next-message card: the figure, where the 5-hour window lands, and a colour bar of what is read from the cache and what is written.
 - Pane content centres and its bars fill the width in a wide pane.
 - Confirmation before a model switch that would rewrite a warm cache for more than `confirmSwitchUsd` (default $0.50).
 - Warning when MCP servers change while the cache is warm.

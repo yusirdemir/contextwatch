@@ -3,14 +3,14 @@ import { atom, read, update } from 'claude-code'
 
 import type { Limits, LimitWindow } from '../../types'
 import { compactAdvice } from '../core/compact'
-import { floorCost, stayCost, switchOptions } from '../core/forecast'
+import { nextBreakdown, switchOptions } from '../core/forecast'
 import { cacheDropped, contextTokens, formatPercent, formatTokens, hitRate } from '../core/metrics'
 import { isSameModel, modelLabel } from '../core/pricing'
 import { formatChange } from '../core/tools'
 import { formatMinutes, remainingMs, TTL_MS, ttlLabel, warmth } from '../core/ttl'
 import { formatImpact, formatLanding, formatPercentUsed, formatUntil, pointsOf } from '../core/usage'
 import { compactNow } from '../sources/compact'
-import { barSvg, barText, usageInk, usageSvg, usageText } from './charts'
+import { barSvg, barText, INK, stackSvg, stackText, usageInk, usageSvg, usageText } from './charts'
 import { COLOR, DOT, INK_OF, LABEL } from './theme'
 
 const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
@@ -60,7 +60,6 @@ export function registerPane(on: On) {
 
     const state = warmth(last, time)
     const left = remainingMs(last, time)
-    const coldUsd = stayCost(list, time).cold
     const misses = list.filter((s, i) => i > 0 && cacheDropped(s)).length
     const isSwitched = model !== null && !isSameModel(model, last.model)
     const advice = state === 'cooling' ? compactAdvice(list, time, stats) : null
@@ -78,7 +77,7 @@ export function registerPane(on: On) {
     )
 
     // One usage window: its name, a bar, how full it is and when it resets.
-    // The 5-hour bar shows what a cold cache would add, faint, past the fill.
+    // The 5-hour bar shows what the next message adds, faint, past the fill.
     const usageRow = (key: string, name: string, w: LimitWindow, extra: number) => {
       const until = formatUntil(w.resetsAt, time)
       const used = w.percent / 100
@@ -108,56 +107,77 @@ export function registerPane(on: On) {
       )
     }
 
-    const usage = (() => {
-      // The least the next message adds, from the context and the cache alone.
-      const floorUsd = floorCost(list, time, draft)
-      const next = formatImpact(floorUsd, windows, cal)
-      const context = contextTokens(last)
-      const typed = draft > 0 ? `, your message's ~${formatTokens(draft)}` : ''
-      const how =
-        state === 'cold'
-          ? `The cache is cold: all ${formatTokens(context)} tokens${typed === '' ? '' : ' and your message'} are written again.`
-          : `${formatTokens(context - last.outputTokens)} tokens read from the cache; the last answer's ${formatTokens(last.outputTokens)}${typed} written.`
+    // The next message as a card: the figure, where the 5-hour window lands,
+    // and a bar of what it is made of (read from the cache, or written to it).
+    const parts = nextBreakdown(list, time, draft)
+    const next = formatImpact(parts?.total ?? null, windows, cal)
+    const points = pointsOf(parts?.total ?? null, cal)
+    const landing = windows?.fiveHour == null || points === null ? null : formatLanding(windows.fiveHour, points)
 
-      if (windows === null) {
-        return next === null ? null : (
-          <Box flexDirection="column">
-            <Text dimColor>Next message: {next}</Text>
-            <Text dimColor size="caption">
-              {how}
-            </Text>
-          </Box>
-        )
-      }
+    const nextCard = (() => {
+      if (parts === null) return null
 
-      const points = pointsOf(floorUsd, cal)
-      const extra = points ?? 0
+      const whole = Math.max(parts.total, 1e-9)
+      const segments = [
+        { fraction: parts.readUsd / whole, color: INK.warm },
+        { fraction: parts.writeUsd / whole, color: INK.cooling },
+      ]
+      const share = (usd: number) => `${Math.round((usd / whole) * 100)}%`
+      const written = draft > 0 ? 'last answer + your message' : 'last answer'
 
       return (
         <Box flexDirection="column" gap={1}>
           <Text dimColor size="caption">
-            USAGE
+            NEXT MESSAGE
           </Text>
-          {windows.fiveHour !== null && usageRow('five', '5-hour', windows.fiveHour, extra)}
-          {windows.weekly !== null && usageRow('week', 'Weekly', windows.weekly, 0)}
-          {next !== null && points !== null && windows.fiveHour !== null && (
-            <Box flexDirection="column">
-              <Text dimColor size="caption">
-                Next message: {next} · {formatLanding(windows.fiveHour, points)}
+          <Box flexDirection="row" justifyContent="space-between" alignItems="flex-end">
+            <Text size="heading" weight="semibold">
+              {next ?? '…'}
+            </Text>
+            {landing !== null && <Text dimColor>{landing}</Text>}
+          </Box>
+          {isSvg ? (
+            <els.Svg key="stack" source={stackSvg(segments)} alt={`${share(parts.readUsd)} read, ${share(parts.writeUsd)} written`} height={8} />
+          ) : (
+            <Text dimColor>{stackText(segments)}</Text>
+          )}
+          {parts.readTokens > 0 && (
+            <Box flexDirection="row" justifyContent="space-between">
+              <Text>
+                <Text color="success">● </Text>
+                <Text dimColor>{formatTokens(parts.readTokens)} read from cache</Text>
               </Text>
-              <Text dimColor size="caption">
-                {how} Tool calls and the answer add a little more.
-              </Text>
+              <Text dimColor>{share(parts.readUsd)}</Text>
             </Box>
           )}
+          <Box flexDirection="row" justifyContent="space-between">
+            <Text>
+              <Text color="warning">● </Text>
+              <Text dimColor>
+                {formatTokens(parts.writeTokens)} written{state === 'cold' ? ', the whole context' : ` · ${written}`}
+              </Text>
+            </Text>
+            <Text dimColor>{share(parts.writeUsd)}</Text>
+          </Box>
           {next === null && (
             <Text dimColor size="caption">
-              Learning how much a question moves your 5-hour window.
+              Learning how much a message moves your 5-hour window.
             </Text>
           )}
         </Box>
       )
     })()
+
+    const usage =
+      windows === null ? null : (
+        <Box flexDirection="column" gap={1}>
+          <Text dimColor size="caption">
+            USAGE
+          </Text>
+          {windows.fiveHour !== null && usageRow('five', '5-hour', windows.fiveHour, points ?? 0)}
+          {windows.weekly !== null && usageRow('week', 'Weekly', windows.weekly, 0)}
+        </Box>
+      )
 
     const tip = (() => {
       if (state !== 'cold' && isSwitched) {
@@ -228,6 +248,8 @@ export function registerPane(on: On) {
           </Text>
 
         </Box>
+
+        {nextCard}
 
         {usage}
 

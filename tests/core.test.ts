@@ -4,7 +4,7 @@ import type { Snapshot } from '../types'
 import { compactAdvice } from '../src/core/compact'
 import { explainLast } from '../src/core/explain'
 import { cacheDropped, contextTokens, formatTokens, hitRate } from '../src/core/metrics'
-import { floorCost, stayCost, switchOptions } from '../src/core/forecast'
+import { floorCost, nextBreakdown, stayCost, switchOptions } from '../src/core/forecast'
 import { formatUsd, modelLabel, priceOf, promptCost, responseCost } from '../src/core/pricing'
 import { bucketTokens, estimateTokens } from '../src/core/tokens'
 import { diffServers, formatChange, serversOf } from '../src/core/tools'
@@ -233,4 +233,18 @@ test('the typed message is written on top of the floor', () => {
   const list = [snap({ at: 0 })]
   expect(near(floorCost(list, MIN, 1_000), (100_302 * 0.2 + (100 + 1_000) * 4 * 2) / 1e6)).toBe(true)
   expect(near(floorCost(list, 61 * MIN, 1_000), (101_402 * 4 * 2) / 1e6)).toBe(true)
+})
+
+test('the next message splits into what is read and what is written', () => {
+  const list = [snap({ at: 0 })]
+  const warm = nextBreakdown(list, MIN, 40)!
+  expect(warm.readTokens).toBe(100_302)
+  expect(warm.writeTokens).toBe(140)
+  expect(near(warm.readUsd, 100_302 * 0.2 / 1e6)).toBe(true)
+  expect(near(warm.writeUsd, 140 * 4 * 2 / 1e6)).toBe(true)
+  expect(near(warm.total, floorCost(list, MIN, 40)!)).toBe(true)
+
+  const cold = nextBreakdown(list, 61 * MIN)!
+  expect(cold.readTokens).toBe(0)
+  expect(cold.writeTokens).toBe(100_402)
 })

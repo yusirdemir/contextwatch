@@ -26,7 +26,7 @@ contextwatch shows how much time is left, and when the cache has gone cold it sa
 - **MCP change warning**: flags a connected or dropped MCP server while the cache is warm, since the tool list is part of the cached prompt.
 - **Away reminder** (off by default): one notice a few minutes before the cache lapses.
 - **Calm colour**: green while warm, amber in the last ten minutes of an hour, grey once cold.
-- **Detail pane**: the minutes left as one large figure, the usage windows, at most one suggestion, the other models on request, and a one-line session summary.
+- **Detail pane**: the minutes left as one large figure; a next-message card with the figure, where the 5-hour window lands and a colour bar of what is read from the cache (green) and what is written (amber); the usage windows; at most one suggestion; the other models on request; and a one-line session summary.
 - **Miss alerts**: a short notice when a response had to write the cache again.
 - **`/contextwatch why`**: explains the last miss — the TTL lapsed, the model changed, or the prompt prefix changed.
 - **TTL detection**: learns whether your cache lives one hour or five minutes from your own responses.
@@ -54,7 +54,7 @@ Answer `y` to add the marketplace, then choose a scope. The pane opens with your
 | Above the prompt, cold | `○ Cache cold · next message rewrites 187k (+6%)` |
 | Above the prompt, after a model switch | `● Switched to Sonnet 5.5 · cache rewrite +3%` |
 | Above the prompt, after an MCP change | `● MCP changed (+github) · likely cache rewrite +6%` |
-| Pane (**Context**) | Minutes left, 5-hour and weekly usage with reset times, one suggestion, other models on request, session summary |
+| Pane (**Context**) | Minutes left, next-message card with a read/write colour bar, 5-hour and weekly usage with reset times, one suggestion, other models on request, session summary |
 
 | Command | Does |
 | --- | --- |

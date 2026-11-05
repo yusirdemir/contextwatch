@@ -53,3 +53,31 @@ export const usageText = (used: number, extra: number, cells = 16): string => {
 
 // Usage colour: calm until the window is nearly full.
 export const usageInk = (percent: number): string => (percent >= 90 ? '#f85149' : percent >= 75 ? INK.cooling : INK.muted)
+
+// Parts side by side in one bar, each a fraction of the whole; a sliver
+// still shows, so a small part is never lost.
+export const stackSvg = (parts: readonly { fraction: number; color: string }[], width = 1000, height = 8): string => {
+  const min = 8
+  const raw = parts.map(p => (p.fraction > 0 ? Math.max(min, p.fraction * width) : 0))
+  const scale = width / Math.max(1, raw.reduce((a, b) => a + b, 0))
+  let x = 0
+  const rects = parts
+    .map((p, i) => {
+      const w = round((raw[i] ?? 0) * scale)
+      const rect = w > 0 ? `<rect x="${round(x)}" width="${w}" height="${height}" fill="${p.color}" fill-opacity="0.9"/>` : ''
+      x += w
+
+      return rect
+    })
+    .join('')
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">` +
+    `<clipPath id="s"><rect width="${width}" height="${height}" rx="${height / 2}"/></clipPath><g clip-path="url(#s)">${rects}</g></svg>`
+}
+
+// The same in text: "██████████▓▓".
+export const stackText = (parts: readonly { fraction: number }[], cells = 24): string => {
+  const marks = ['█', '▓', '▒']
+
+  return parts.map((p, i) => marks[i % marks.length]!.repeat(p.fraction > 0 ? Math.max(1, Math.round(p.fraction * cells)) : 0)).join('')
+}

@@ -66,7 +66,7 @@ While warm, the last prompt is still cached and is read; the last answer joined 
 
 **The draft.** `prompt.edit` and `prompt.change` report the prompt box after every edit. Claude Code exposes no tokenizer to a mod, so the draft is estimated from its characters: about 3.5 ASCII characters a token, 1.5 for other scripts (Turkish letters, accents, emoji), erring high. The estimate is rounded up in steps of 20 tokens so typing does not redraw the band on every key.
 
-The band shows the figure as points of the 5-hour window; the pane adds where the window lands (`41% → 42%`) and draws it as a faint segment on the bar. It grows as the conversation grows and drops after a compaction.
+The band shows the figure as points of the 5-hour window. The pane shows it as a card: the figure, where the window lands (`41% → 42%`), and a bar split by cost into what is read from the cache (green) and what is written (amber), with the tokens and share of each. The same figure is drawn as a faint segment on the 5-hour usage bar. It grows as the conversation grows and drops after a compaction.
 
 ## Explaining a miss
 

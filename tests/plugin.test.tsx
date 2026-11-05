@@ -397,7 +397,10 @@ test('the usage a cold cache would add is learned from the spend', async ($, on)
     requestId: 'contextwatch',
     props: { title: 'Context', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} },
   })
-  expect((await pane.find({ type: 'Text', text: /^Next message/ }))?.text).toMatch(/^Next message: <0\.1% · 44% → 44%/)
+  expect((await pane.find({ type: 'Text', text: /^<0\.1%$/ }))?.text).toBe('<0.1%')
+  expect(await pane.find({ type: 'Text', text: /^44% → 44%$/ })).toBeDefined()
+  expect((await pane.find({ type: 'Text', text: /read from cache$/ }))?.text).toMatch(/113k read from cache$/)
+  expect((await pane.find({ type: 'Text', text: /written/ }))?.text).toMatch(/100 written · last answer$/)
   await pane.unmount()
 
   // Once cold, a rewrite of 113k tokens on Opus 5.5 is ~$0.91, so ~1.8 points.
