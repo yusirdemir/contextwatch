@@ -1,6 +1,8 @@
-# Fields contextwatch reads
+# Field reference
 
-## Live, from the mod API
+The usage fields Claude Code exposes, what contextwatch reads today, and what is available for future features.
+
+## Live, from the mod API (read today)
 
 | Source | Field | Use |
 | --- | --- | --- |
@@ -8,15 +10,15 @@
 | | `cache_read_input_tokens` | Served from cache; large means a hit |
 | | `cache_creation_input_tokens` | Written to cache this request |
 | | `output_tokens` | Output |
-| `$.session.usage()` | `context.tokens`, `context.window`, `context.percent` | Window fullness |
-| | `rateLimits` | Five-hour and seven-day windows |
-| | `cost` | Session cost |
+| `$.session.usage()` | `context.tokens`, `context.window`, `context.percent` | Window fullness (not used yet) |
+| | `rateLimits` | Five-hour and seven-day windows (not used yet) |
+| | `cost` | Session cost (not used yet) |
 
-The live usage has no TTL breakdown, so the TTL comes from the transcript.
+The live usage has no TTL breakdown, so contextwatch infers the TTL; see [how-it-works.md](how-it-works.md#ttl-inference).
 
-## Transcript: `~/.claude/projects/<project>/<sessionId>.jsonl`
+## Transcript (reference, not read)
 
-One JSON object per line, appended as the session runs.
+Claude Code also writes each session to `~/.claude/projects/<project>/<sessionId>.jsonl`, one JSON object per line. contextwatch does not read it: the engine caps a single file read at 4 MiB and long sessions exceed that. The fields are listed here for future features.
 
 ### `type: "assistant"`
 
