@@ -53,6 +53,8 @@ declare module 'claude-code' {
       // The subscription's usage windows; null with an API key.
       limits: Limits | null
       calibration: Calibration
+      // The message being typed, in estimated tokens, rounded up in steps.
+      draftTokens: number
       // Whether the pane's model comparison is open.
       showModels: boolean
     }

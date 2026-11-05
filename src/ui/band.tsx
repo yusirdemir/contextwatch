@@ -20,6 +20,7 @@ const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, 
 const compactStats = atom({ plugin: 'contextwatch', key: 'compactStats' } as const, null)
 const limits = atom({ plugin: 'contextwatch', key: 'limits' } as const, null)
 const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null })
+const draftTokens = atom({ plugin: 'contextwatch', key: 'draftTokens' } as const, 0)
 
 // `tip` is the quiet suggestion drawn after the line; `canCompact` adds its button.
 type Line = { dot: string; color: Color; words: string; tip?: string; canCompact?: boolean }
@@ -32,6 +33,7 @@ type Inputs = {
   stats: CompactStats | null
   windows: Limits | null
   cal: Calibration
+  draft: number
 }
 
 // One quiet line above the prompt with the Details button. An alert that
@@ -49,6 +51,7 @@ export function registerBand(on: On) {
       stats: await read($, compactStats),
       windows: await read($, limits),
       cal: await read($, calibration),
+      draft: await read($, draftTokens),
     })
     const { Box, Button, Text } = $.ui.resolve(e)
 
@@ -69,7 +72,7 @@ export function registerBand(on: On) {
 // " +6%" straight after the words it measures.
 const after = (impact: string | null) => (impact === null ? '' : ` ${impact}`)
 
-const lineFor = ({ list, time, model, change, stats, windows, cal }: Inputs): Line => {
+const lineFor = ({ list, time, model, change, stats, windows, cal, draft }: Inputs): Line => {
   const last = list.at(-1)!
   const state = warmth(last, time)
   const tokens = formatTokens(contextTokens(last))
@@ -90,9 +93,10 @@ const lineFor = ({ list, time, model, change, stats, windows, cal }: Inputs): Li
     return { dot: DOT.cold, color: COLOR.cold, words: `Cache cold · next message rewrites ${tokens}${cold === null ? '' : ` (${cold})`}` }
   }
 
-  // The least the next message adds, from the context and the cache alone.
-  const floor = formatImpact(floorCost(list, time), windows, cal)
-  const cost = floor === null ? '' : ` · next message at least ${floor}`
+  // What the next message adds: the context read from the cache, the last
+  // answer and the message being typed written.
+  const next = formatImpact(floorCost(list, time, draft), windows, cal)
+  const cost = next === null ? '' : ` · next message ${next}`
   const words = `Cache ${state === 'cooling' ? 'cooling' : 'warm'} · ${formatMinutes(remainingMs(last, time))}${cost}`
 
   // Cooling is the moment to compact: reading the context is still cheap.

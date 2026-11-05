@@ -7,6 +7,7 @@ import { guardColdSend, guardModelSwitch, watchAway } from '../src/guards'
 import type { Options } from '../src/options'
 import { readOptions } from '../src/options'
 import { watchCompactions } from '../src/sources/compact'
+import { watchDraft } from '../src/sources/draft'
 import { watchLive } from '../src/sources/live'
 import { registerBand } from '../src/ui/band'
 import { openPane, registerPane } from '../src/ui/pane'
@@ -52,6 +53,7 @@ export const register: Register = (on, raw) => {
   answerCommand(on)
   watchLive(on)
   watchCompactions(on)
+  watchDraft(on)
   guardModelSwitch(on, options)
   guardColdSend(on, options)
   registerBand(on)

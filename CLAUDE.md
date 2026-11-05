@@ -19,15 +19,16 @@ contextwatch is a Claude Code mod (a plugin with a hooks module) that shows how 
 | Path | Role |
 | --- | --- |
 | `hooks/register.tsx` | Entry point. Wires features together and runs the one-second ticker |
-| `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), `compact.ts` (compact-now advice), `usage.ts` (usage windows, the learned points-per-dollar ratio, impact and landing formatting), formatting |
+| `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), `compact.ts` (compact-now advice), `tokens.ts` (draft token estimate), `usage.ts` (usage windows, the learned points-per-dollar ratio, impact and landing formatting), formatting |
 | `src/sources/live.ts` | Turns `turn.step` usage into a `Snapshot` and stores it |
 | `src/sources/tools.ts` | MCP servers behind the current tool list |
+| `src/sources/draft.ts` | Follows the prompt box (`prompt.edit`, `prompt.change`) for the draft's estimated tokens |
 | `src/sources/compact.ts` | Learns compaction sizes from `session.compact`; the Compact button's call |
 | `src/ui/` | Band above the prompt, detail pane, theme, `charts.ts` (progress bar as SVG and text) |
 | `src/commands.ts` | `/contextwatch` and `/contextwatch why` |
 | `src/guards.ts` | Model switch confirmation, away reminder, MCP change check |
 | `src/options.ts` | Reads the `userConfig` options declared in `plugin.json` |
-| `types/index.d.ts` | `$.state` contract: `history`, `now`, `sessionUsd`, `activeModel`, `toolBaseline`, `toolChange`, `lastCompactAt`, `compactStats`, `limits`, `calibration`, `showModels` under `contextwatch` |
+| `types/index.d.ts` | `$.state` contract: `history`, `now`, `sessionUsd`, `activeModel`, `toolBaseline`, `toolChange`, `lastCompactAt`, `compactStats`, `limits`, `calibration`, `draftTokens`, `showModels` under `contextwatch` |
 | `tests/` | `core.test.ts` (pure logic), `plugin.test.tsx` (engine and UI) |
 | `docs/` | How it works, and every field the mod reads |
 
@@ -41,6 +42,7 @@ The validator enforces these; breaking one fails `claude plugin validate`.
 - `on('session.start')` may be registered only once without a matcher.
 - Never name a local variable `read` or `update`: it shadows the state functions and the validator rejects the module.
 - `$.command.run` (and a compaction) cannot run inside `prompt.submit`: it would wait on the turn the hook holds. Drop the prompt, run the action from `$.clock.after(0, …)`, then `$.prompt.submit({ text, asUser: true })`.
+- The test kit cannot raise `prompt.edit` or `prompt.change`; test the draft through `estimateTokens` and `floorCost` instead.
 - `$.ui.ask` is the `AskUserQuestion` tool: in tests answer it with `on('tool.call', { tool: 'AskUserQuestion' }, …)`, and `{ deny }` for a dismissal.
 - New settings go in `userConfig` in `plugin.json` and are parsed in `src/options.ts`; document them in the README's Settings table.
 - In tests, a `session.compact` call needs at least one message; argless `$.session.compact()` from the plugin cannot run there, so test the button's presence, not the press.
@@ -60,7 +62,7 @@ npx tsc -p .
 
 ## Units
 
-Subscribers see usage as points of the 5-hour window (`formatImpact`), never dollars; dollars appear only where there are no usage windows (an API key). Route every user-facing cost through `formatImpact`. Show a cost only for what is true now (a cold cache, a switch or MCP change about to rewrite it), never a hypothetical "if cold" figure; the next-message figure is a floor computed from the context and the cache alone (`floorCost`), never an average of past questions. Usage windows belong in the pane, not the band.
+Subscribers see usage as points of the 5-hour window (`formatImpact`), never dollars; dollars appear only where there are no usage windows (an API key). Route every user-facing cost through `formatImpact`. Show a cost only for what is true now (a cold cache, a switch or MCP change about to rewrite it), never a hypothetical "if cold" figure; the next-message figure comes from the context, the cache and the typed draft (`floorCost`), never an average of past questions. Usage windows belong in the pane, not the band.
 
 ## Prices
 

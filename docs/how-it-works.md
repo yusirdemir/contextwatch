@@ -55,16 +55,18 @@ A miss right after a model change says nothing about the TTL and is ignored.
 
 ## Next message
 
-The figure is a floor, worked out from the context and the cache alone, not from past questions:
+Worked out from the context, the cache and the prompt box, not from past questions:
 
 ```text
-warm   = (context − last answer) × cacheRead  +  last answer × input × write multiplier
-cold   = context × input × write multiplier
+warm   = (context − last answer) × cacheRead  +  (last answer + draft) × input × write multiplier
+cold   = (context + draft) × input × write multiplier
 ```
 
-While warm, the last prompt is still cached and is read; the last answer joined the context after it was cached, so it is written. Once cold, everything is written. Your new message, any tool calls and the answer come on top, which is why it is "at least".
+While warm, the last prompt is still cached and is read; the last answer joined the context after it was cached, so it is written, as is the message being typed. Once cold, everything is written. Tool calls and the answer add a little more on top.
 
-The band shows it as points of the 5-hour window; the pane adds where the window lands (`41% → 42%`) and draws it as a faint segment on the bar. Both grow as the conversation grows and drop after a compaction.
+**The draft.** `prompt.edit` and `prompt.change` report the prompt box after every edit. Claude Code exposes no tokenizer to a mod, so the draft is estimated from its characters: about 3.5 ASCII characters a token, 1.5 for other scripts (Turkish letters, accents, emoji), erring high. The estimate is rounded up in steps of 20 tokens so typing does not redraw the band on every key.
+
+The band shows the figure as points of the 5-hour window; the pane adds where the window lands (`41% → 42%`) and draws it as a faint segment on the bar. It grows as the conversation grows and drops after a compaction.
 
 ## Explaining a miss
 

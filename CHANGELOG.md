@@ -19,7 +19,7 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 - Cost of the first message after switching to each other model, and a warning in the band right after a switch.
 - Per-model cache tracking: a model used earlier in the session that is still warm is priced as a partial hit.
 - Question before sending into a large cold cache: send anyway, compact then send, or start fresh then send (`askWhenCold`).
-- Next message in the band (`next message at least +0.7%`): an exact floor from the context and the cache, not an average of past questions. The pane shows where the 5-hour window lands (`41% → 42%`) as a faint segment on the bar.
+- Next message in the band (`next message +0.7%`): worked out from the context, the cache and the message being typed (estimated tokens), not an average of past questions. The pane shows where the 5-hour window lands (`41% → 42%`) as a faint segment on the bar.
 - The status line is gone; the band above the prompt carries the countdown.
 - Band shows the cache state only; a cost appears once the cache is cold or a switch will rewrite it. Usage windows live in the pane.
 - Pane content centres and its bars fill the width in a wide pane.

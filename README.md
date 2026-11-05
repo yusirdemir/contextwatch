@@ -10,13 +10,13 @@ Claude Code caches your conversation for a limited time, usually one hour. While
 contextwatch shows how much time is left, and when the cache has gone cold it says what the next message will cost, so you know before you send.
 
 ```text
-● Cache warm · 55 min · next message at least +0.7%   [Details]
+● Cache warm · 55 min · next message +0.7%   [Details]
 ```
 
 ## Features
 
 - **Countdown**: minutes left before the cache lapses, above the prompt. It updates every 30 seconds and never shows seconds, so it stays out of the way. Costs appear only when they apply: once the cache is cold, or a switch is about to rewrite it.
-- **Next message**: the least your next message will add to the 5-hour window, worked out from the context and the cache alone: the last prompt read from the cache and the last answer written, or everything written once cold. The pane shows where the window lands (`41% → 42%`) as a faint segment on the bar. It grows as the context grows; compacting resets it.
+- **Next message**: what your next message will add to the 5-hour window, worked out from the context, the cache and what you are typing: the last prompt read from the cache, the last answer and your draft written, or everything written once cold. It updates as you type. The pane shows where the window lands (`41% → 42%`) as a faint segment on the bar. It grows as the context grows; compacting resets it.
 - **Cold-send question**: send a message into a large cold cache and contextwatch asks first: send anyway, compact then send, or start fresh then send.
 - **Compact before you leave**: in the last ten minutes, a quiet grey tip compares compacting now with coming back to a cold cache, with a **Compact** button. A compaction reads the whole context, which is cheap only while it is still cached.
 - **Alerts in place**: after a model switch or an MCP change that will rewrite a warm cache, the line above the prompt turns amber and says so.
@@ -49,7 +49,7 @@ Answer `y` to add the marketplace, then choose a scope. The pane opens with your
 
 | Where | What you see |
 | --- | --- |
-| Above the prompt | `● Cache warm · 55 min · next message at least +0.7%` and a **Details** button that opens the pane |
+| Above the prompt | `● Cache warm · 55 min · next message +0.7%` and a **Details** button that opens the pane |
 | Above the prompt, cooling | `● Cache cooling · 8 min · Leaving? Compact first` and a **Compact** button |
 | Above the prompt, cold | `○ Cache cold · next message rewrites 187k (+6%)` |
 | Above the prompt, after a model switch | `● Switched to Sonnet 5.5 · cache rewrite +3%` |

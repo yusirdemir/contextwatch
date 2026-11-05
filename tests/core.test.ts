@@ -6,6 +6,7 @@ import { explainLast } from '../src/core/explain'
 import { cacheDropped, contextTokens, formatTokens, hitRate } from '../src/core/metrics'
 import { floorCost, stayCost, switchOptions } from '../src/core/forecast'
 import { formatUsd, modelLabel, priceOf, promptCost, responseCost } from '../src/core/pricing'
+import { bucketTokens, estimateTokens } from '../src/core/tokens'
 import { diffServers, formatChange, serversOf } from '../src/core/tools'
 import { calibrate, formatImpact, formatLanding, formatUntil, parseLimits, pointsOf } from '../src/core/usage'
 import { formatAgo, formatMinutes, inferTtl, remainingMs, warmth } from '../src/core/ttl'
@@ -214,4 +215,22 @@ test('the next message costs at least what the context and the cache say', () =>
   expect(pointsOf(0.4, { anchor: null, percentPerUsd: null })).toBeNull()
   expect(formatLanding({ percent: 41, resetsAt: null }, 2.3)).toBe('41% → 43%')
   expect(formatLanding({ percent: 99, resetsAt: null }, 5)).toBe('99% → 100%')
+})
+
+test('typed text is estimated in tokens, erring high', () => {
+  expect(estimateTokens('')).toBe(0)
+  expect(estimateTokens('   ')).toBe(0)
+  // ASCII about 3.5 characters a token.
+  expect(estimateTokens('x'.repeat(350))).toBe(100)
+  // Turkish letters cost more: "kanka şöyle" is 9 ASCII and 2 others.
+  expect(estimateTokens('kanka şöyle')).toBe(Math.ceil(9 / 3.5 + 2 / 1.5))
+  expect(bucketTokens(0)).toBe(0)
+  expect(bucketTokens(1)).toBe(20)
+  expect(bucketTokens(41)).toBe(60)
+})
+
+test('the typed message is written on top of the floor', () => {
+  const list = [snap({ at: 0 })]
+  expect(near(floorCost(list, MIN, 1_000), (100_302 * 0.2 + (100 + 1_000) * 4 * 2) / 1e6)).toBe(true)
+  expect(near(floorCost(list, 61 * MIN, 1_000), (101_402 * 4 * 2) / 1e6)).toBe(true)
 })

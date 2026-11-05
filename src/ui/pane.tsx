@@ -21,6 +21,7 @@ const compactStats = atom({ plugin: 'contextwatch', key: 'compactStats' } as con
 const showModels = atom({ plugin: 'contextwatch', key: 'showModels' } as const, false)
 const limits = atom({ plugin: 'contextwatch', key: 'limits' } as const, null)
 const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null })
+const draftTokens = atom({ plugin: 'contextwatch', key: 'draftTokens' } as const, 0)
 
 export const PANE = 'contextwatch'
 
@@ -55,6 +56,7 @@ export function registerPane(on: On) {
     const isOpen = await read($, showModels)
     const windows: Limits | null = await read($, limits)
     const cal = await read($, calibration)
+    const draft = await read($, draftTokens)
 
     const state = warmth(last, time)
     const left = remainingMs(last, time)
@@ -108,18 +110,19 @@ export function registerPane(on: On) {
 
     const usage = (() => {
       // The least the next message adds, from the context and the cache alone.
-      const floorUsd = floorCost(list, time)
+      const floorUsd = floorCost(list, time, draft)
       const next = formatImpact(floorUsd, windows, cal)
       const context = contextTokens(last)
+      const typed = draft > 0 ? `, your message's ~${formatTokens(draft)}` : ''
       const how =
         state === 'cold'
-          ? `The cache is cold: all ${formatTokens(context)} tokens are written again.`
-          : `${formatTokens(context - last.outputTokens)} tokens read from the cache, the last answer's ${formatTokens(last.outputTokens)} written.`
+          ? `The cache is cold: all ${formatTokens(context)} tokens${typed === '' ? '' : ' and your message'} are written again.`
+          : `${formatTokens(context - last.outputTokens)} tokens read from the cache; the last answer's ${formatTokens(last.outputTokens)}${typed} written.`
 
       if (windows === null) {
         return next === null ? null : (
           <Box flexDirection="column">
-            <Text dimColor>Next message: at least {next}</Text>
+            <Text dimColor>Next message: {next}</Text>
             <Text dimColor size="caption">
               {how}
             </Text>
@@ -140,10 +143,10 @@ export function registerPane(on: On) {
           {next !== null && points !== null && windows.fiveHour !== null && (
             <Box flexDirection="column">
               <Text dimColor size="caption">
-                Next message: at least {next} · {formatLanding(windows.fiveHour, points)}
+                Next message: {next} · {formatLanding(windows.fiveHour, points)}
               </Text>
               <Text dimColor size="caption">
-                {how} Your message, tool calls and the answer come on top.
+                {how} Tool calls and the answer add a little more.
               </Text>
             </Box>
           )}

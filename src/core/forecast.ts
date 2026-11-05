@@ -67,14 +67,15 @@ export const switchOptions = (list: readonly Snapshot[], now: number): Option[] 
 
 // The least the next message can cost, from the context and the cache
 // alone: the last prompt is read from the cache, and the last answer, which
-// joined the context after it was cached, is written. Cold, all of it is
-// written. Your new message, tool calls and the answer come on top.
-export const floorCost = (list: readonly Snapshot[], now: number): number | null => {
+// joined the context after it was cached, is written, as is the message being
+// typed (`draftTokens`). Cold, all of it is written. Tool calls and the
+// answer come on top.
+export const floorCost = (list: readonly Snapshot[], now: number, draftTokens = 0): number | null => {
   const last = list.at(-1)
   if (last === undefined) return null
 
   const context = contextTokens(last)
   const cached = remainingMs(last, now) > 0 ? context - last.outputTokens : 0
 
-  return promptCost(last.model, context, cached, last.ttl)
+  return promptCost(last.model, context + draftTokens, cached, last.ttl)
 }
