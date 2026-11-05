@@ -1,3 +1,7 @@
-import { atom } from 'claude-code'
+// The validator reads each $.state atom where it is used, so every file that
+// reads or writes one declares it itself with the same plugin and key:
+//
+//   history: Snapshot[]  the session's responses, oldest first
+//   now: number          the clock, ticked every second so countdowns redraw
 
-export const last = atom({ plugin: 'contextwatch', key: 'last' } as const, null)
+export const HISTORY_LIMIT = 50

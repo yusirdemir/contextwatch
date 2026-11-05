@@ -2,17 +2,23 @@
 
 export type Ttl = '5m' | '1h'
 
-// One main-thread API response, as the mod sees it.
+// How the TTL was settled: assumed, or seen in the responses themselves.
+export type TtlSource = 'default' | 'observed'
+
+// One main-thread API response.
 export type Snapshot = {
   at: number
+  model: string
   ttl: Ttl
+  ttlSource: TtlSource
   inputTokens: number
   cacheReadTokens: number
   cacheCreationTokens: number
+  outputTokens: number
 }
 
 declare module 'claude-code' {
   interface PluginState {
-    contextwatch: { last: Snapshot | null }
+    contextwatch: { history: Snapshot[]; now: number }
   }
 }
