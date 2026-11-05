@@ -97,7 +97,7 @@ test('a response starts the countdown', async ($, on) => {
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const band = await $.ui.mount({ plugin: 'contextwatch', surface, component: 'AbovePrompt', props: { hasSurvey: false } as never })
-    expect((await band.find({ type: 'Text', text: /48 min left/ }))?.text).toMatch(/cache read ~\$0\.02 · cold ~\$0\.91/)
+    expect((await band.find({ type: 'Text', text: /Cache 48 min/ }))?.text).toMatch(/\$0\.02 now · \$0\.91 if cold/)
     expect(await band.find({ type: 'Button', key: 'details' })).toBeDefined()
     await band.unmount()
   }
@@ -149,9 +149,14 @@ test('the pane shows the countdown, switch costs and the session total', async (
         view: {},
       },
     })
-    expect((await pane.find({ type: 'Text', text: /left$/ }))?.text).toBe('55 min left')
+    expect((await pane.find({ type: 'Text', text: /^55 min$/ }))?.text).toBe('55 min')
+    expect((await pane.find({ type: 'Text', text: /this session/ }))?.text).toMatch(/\$1\.23 this session/)
+
+    // The model comparison stays closed until asked for.
+    expect(await pane.find({ type: 'Text', text: /^Sonnet 5\.5/ })).toBeUndefined()
+    await pane.press({ key: 'models' })
     expect(await pane.find({ type: 'Text', text: /^Sonnet 5\.5/ })).toBeDefined()
-    expect((await pane.find({ type: 'Text', text: /^\$1\.23$/ }))?.text).toBe('$1.23')
+    await pane.press({ key: 'models' })
     await pane.unmount()
   }
 })
@@ -231,14 +236,14 @@ test('an MCP server change while warm is flagged in the band', async ($, on) => 
   await clock.advance(1 * MIN)
 
   const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
-  expect((await band.find({ type: 'Text', text: /MCP servers changed/ }))?.text).toMatch(/\+slack/)
+  expect((await band.find({ type: 'Text', text: /MCP changed/ }))?.text).toMatch(/\+slack/)
   await band.unmount()
 
   // The next response is sent with the new tools, so the warning clears.
   await drain($.turn.step(STEP))
   await clock.advance(1 * MIN)
   const after = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
-  expect(await after.find({ type: 'Text', text: /MCP servers changed/ })).toBeUndefined()
+  expect(await after.find({ type: 'Text', text: /MCP changed/ })).toBeUndefined()
   await after.unmount()
 })
 
@@ -251,7 +256,7 @@ test('the status line carries the countdown and both cache costs', async ($, on)
   await drain($.turn.step(STEP))
   await clock.advance(5 * MIN)
 
-  expect(lines.at(-1)).toBe('cache 55 min · read $0.02 · cold $0.91')
+  expect(lines.at(-1)).toBe('cache 55 min · $0.02 now · $0.91 if cold')
 })
 
 test('a model switch shows the line above the prompt', async ($, on) => {
@@ -265,7 +270,7 @@ test('a model switch shows the line above the prompt', async ($, on) => {
   await clock.advance(1 * MIN)
 
   const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
-  expect((await band.find({ type: 'Text', text: /Switched to/ }))?.text).toMatch(/Sonnet 5\.5 · cache rewrite 113k tokens/)
+  expect((await band.find({ type: 'Text', text: /Switched to/ }))?.text).toMatch(/Sonnet 5\.5 · cache rewrite ~\$/)
   await band.unmount()
 })
 
@@ -285,7 +290,7 @@ test('while cooling the band suggests compacting, with a Compact button', async 
   // Eight minutes left: compacting now is cheap.
   await clock.advance(22 * MIN)
   band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
-  expect((await band.find({ type: 'Text', text: /Leaving\?/ }))?.text).toMatch(/Compact now ~\$0\.22, come back for ~\$0\.16/)
+  expect((await band.find({ type: 'Text', text: /Leaving\?/ }))?.text).toMatch(/Compact first, come back for ~\$0\.16/)
   expect(await band.find({ type: 'Button', key: 'compact' })).toBeDefined()
   await band.unmount()
 })

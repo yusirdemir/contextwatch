@@ -118,6 +118,6 @@ When `awayReminder` is on, the tick sends one notice per response once the time 
 
 A 30-second ticker writes the engine clock to `contextwatch.now` in session state, and refreshes the session total and the active model. The band and the pane read these values, so they redraw on each tick and after every turn. The UI shows whole minutes only, so a slower tick changes nothing you can see.
 
-## Charts
+## Pane layout
 
-The desktop app draws SVG, so the pane shows bars and a context chart as SVG in mid-tone colours that read on light and dark backgrounds. The terminal has no SVG; it gets the same bars and trend as block characters.
+The pane shows one large figure (minutes left) with a thin progress bar, the next message's cost now and if cold, and at most one suggestion: a model switch or MCP warning, or the compact tip while cooling. The model comparison stays closed until asked for. The desktop app draws the progress bar as SVG in a mid-tone colour that reads on light and dark backgrounds; the terminal draws it with block characters.

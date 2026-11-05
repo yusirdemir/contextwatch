@@ -8,7 +8,7 @@ import { formatMinutes, remainingMs } from '../core/ttl'
 const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
 
-// The always-on line under the prompt, e.g. "cache 55 min · read $0.06 · cold $2.55".
+// The always-on line under the prompt, e.g. "cache 55 min · $0.06 now · $2.55 if cold".
 export async function showStatus($: EngineInterface) {
   const list = await read($, history)
   const last = list.at(-1)
@@ -20,9 +20,9 @@ export async function showStatus($: EngineInterface) {
 
   const time = await read($, now)
   const cost = stayCost(list, time)
-  const readPart = cost.warm === null ? '' : ` · read ${formatUsd(cost.warm)}`
-  const coldPart = cost.cold === null ? '' : cost.warm === null ? ` · rewrite ${formatUsd(cost.cold)}` : ` · cold ${formatUsd(cost.cold)}`
-  const price = `${readPart}${coldPart}`
+  const nowPart = cost.warm === null ? '' : ` · ${formatUsd(cost.warm)} now`
+  const coldPart = cost.cold === null ? '' : cost.warm === null ? ` · next ${formatUsd(cost.cold)}` : ` · ${formatUsd(cost.cold)} if cold`
+  const price = `${nowPart}${coldPart}`
 
   $.ui.status(`cache ${formatMinutes(remainingMs(last, time))}${price}`)
 }

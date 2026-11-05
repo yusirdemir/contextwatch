@@ -38,6 +38,8 @@ declare module 'claude-code' {
       // The last compaction of the main conversation: when, and what it came to.
       lastCompactAt: number | null
       compactStats: CompactStats | null
+      // Whether the pane's model comparison is open.
+      showModels: boolean
     }
   }
 }

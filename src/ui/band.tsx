@@ -62,21 +62,21 @@ const lineFor = (
   if (state !== 'cold' && model !== null && !isSameModel(model, last.model)) {
     const switchCost = switchOptions(list, time).find(o => isSameModel(o.model, model))?.cost ?? null
 
-    return { dot: '●', color: 'warning', words: `Switched to ${modelLabel(model)} · cache rewrite ${tokens} tokens${price(switchCost)}` }
+    return { dot: '●', color: 'warning', words: `Switched to ${modelLabel(model)} · cache rewrite${price(switchCost)}` }
   }
 
   if (state !== 'cold' && change !== null) {
-    return { dot: '●', color: 'warning', words: `MCP servers changed (${formatChange(change)}) · likely cache rewrite${price(cost.cold)}` }
+    return { dot: '●', color: 'warning', words: `MCP changed (${formatChange(change)}) · likely cache rewrite${price(cost.cold)}` }
   }
 
   if (state === 'cold') {
-    return { dot: DOT.cold, color: COLOR.cold, words: `Cache cold · rewrite ${tokens} tokens${price(cost.cold)}` }
+    return { dot: DOT.cold, color: COLOR.cold, words: `Cache cold · next message${price(cost.cold)} (${tokens} rewrite)` }
   }
 
-  const readPart = cost.warm === null ? '' : ` · cache read${price(cost.warm)}`
-  const coldPart = cost.cold === null ? '' : ` · cold${price(cost.cold)}`
+  const nowPart = cost.warm === null ? '' : ` · ${formatUsd(cost.warm)} now`
+  const coldPart = cost.cold === null ? '' : ` · ${formatUsd(cost.cold)} if cold`
 
-  const words = `Cache ${formatMinutes(remainingMs(last, time))} left${readPart}${coldPart}`
+  const words = `Cache ${formatMinutes(remainingMs(last, time))}${nowPart}${coldPart}`
 
   // Cooling is the moment to compact: reading the context is still cheap.
   const advice = state === 'cooling' ? compactAdvice(list, time, stats) : null
@@ -85,7 +85,7 @@ const lineFor = (
       dot: DOT[state],
       color: COLOR[state],
       words,
-      tip: `Leaving? Compact now${price(advice.compactNow)}, come back for${price(advice.backCold)}`,
+      tip: `Leaving? Compact first, come back for${price(advice.backCold)}`,
       canCompact: true,
     }
   }
