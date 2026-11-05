@@ -3,7 +3,7 @@ import { atom, read, update } from 'claude-code'
 
 import { answerCommand, registerCommand } from '../src/commands'
 import { calibrate, parseLimits } from '../src/core/usage'
-import { guardModelSwitch, watchAway } from '../src/guards'
+import { guardColdSend, guardModelSwitch, watchAway } from '../src/guards'
 import type { Options } from '../src/options'
 import { readOptions } from '../src/options'
 import { watchCompactions } from '../src/sources/compact'
@@ -52,6 +52,7 @@ export const register: Register = (on, raw) => {
   watchLive(on)
   watchCompactions(on)
   guardModelSwitch(on, options)
+  guardColdSend(on, options)
   registerBand(on)
   registerPane(on)
 }

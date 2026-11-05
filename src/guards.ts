@@ -1,7 +1,7 @@
 import type { EngineInterface, On } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import { compactAdvice } from './core/compact'
+import { COMPACT_MIN_TOKENS, compactAdvice } from './core/compact'
 import { contextTokens, formatTokens } from './core/metrics'
 import { formatUsd, modelLabel, promptCost } from './core/pricing'
 import { diffServers, formatChange } from './core/tools'
@@ -33,6 +33,60 @@ export function guardModelSwitch(on: On, options: Options) {
       permissionDecisionReason: `Switching to ${modelLabel(e.to_model)} rewrites ${formatTokens(e.context_tokens)} tokens of context (${impact}).${left}`,
     }
   }).catch(($, e, next) => next(e))
+}
+
+export const SEND = 'Send anyway'
+export const COMPACT_FIRST = 'Compact, then send'
+export const START_FRESH = 'Start fresh, then send'
+
+let askedFor: number | undefined
+
+// Before a message goes into a large cold cache, offers the cheaper ways in:
+// compact first (the summary is small to rewrite) or start from a clear
+// conversation. Asked once per cold spell; slash commands pass untouched.
+export function guardColdSend(on: On, options: Options) {
+  on('prompt.submit', async ($, e, next) => {
+    if (!options.askWhenCold || e.command !== undefined || e.isMeta === true) return next(e)
+
+    const last = (await read($, history)).at(-1)
+    const time = await $.clock.now()
+    if (last === undefined || remainingMs(last, time) > 0 || askedFor === last.at) return next(e)
+
+    const context = contextTokens(last)
+    if (context < COMPACT_MIN_TOKENS) return next(e)
+
+    askedFor = last.at
+    const impact = formatImpact(promptCost(last.model, context, 0, last.ttl), await read($, limits), await read($, calibration))
+    const question = `The cache is cold: this message rewrites ${formatTokens(context)} tokens${impact === null ? '' : ` (${impact})`}. How should it go?`
+
+    let answer: string
+    try {
+      answer = await $.ui.ask(question, { options: [SEND, COMPACT_FIRST, START_FRESH], header: 'Cold cache' })
+    } catch {
+      // Dismissed: keep the message for later instead of sending it.
+      await $.prompt.fill({ text: e.text })
+
+      return { drop: 'Not sent; your message is back in the prompt.' }
+    }
+
+    if (answer !== COMPACT_FIRST && answer !== START_FRESH) return next(e)
+
+    // Compacting or clearing would wait on the turn this hook holds, so the
+    // message steps aside, the action runs right after, and the message follows.
+    $.clock.after(0, () => void sendAfter($, answer, e.text))
+
+    return { drop: answer === COMPACT_FIRST ? 'Compacting first; your message follows.' : 'Starting fresh; your message follows.' }
+  }).catch(($, e, next) => next(e))
+}
+
+async function sendAfter($: EngineInterface, answer: string, text: string) {
+  try {
+    if (answer === COMPACT_FIRST) await $.session.compact()
+    else await $.command.run({ command: 'clear' })
+  } catch {
+    // The message still goes; the person can compact or clear by hand.
+  }
+  await $.prompt.submit({ text, asUser: true })
 }
 
 let remindedFor: number | undefined

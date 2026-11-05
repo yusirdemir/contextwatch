@@ -7,19 +7,19 @@
 
 Claude Code caches your conversation for a limited time, usually one hour. While the cache is warm, each message is cheap and fast. Once it lapses, the next message sends the whole context again at full cost. On a long session, that can cost twenty times more than a cached message.
 
-contextwatch shows how much time is left and what a cold cache would do to your usage limit, so you know before you send.
+contextwatch shows how much time is left, and when the cache has gone cold it says what the next message will cost, so you know before you send.
 
 ```text
-● Cache 55 min · 5h 62% · +6% if cold   [Details]
+● Cache warm · 55 min   [Details]
 ```
 
 ## Features
 
-- **Countdown**: minutes left before the cache lapses, above the prompt and in the status line. It updates every 30 seconds and never shows seconds, so it stays out of the way.
+- **Countdown**: minutes left before the cache lapses, above the prompt and in the status line. It updates every 30 seconds and never shows seconds, so it stays out of the way. Costs appear only when they apply: once the cache is cold, or a switch is about to rewrite it.
+- **Cold-send question**: send a message into a large cold cache and contextwatch asks first: send anyway, compact then send, or start fresh then send.
 - **Compact before you leave**: in the last ten minutes, a quiet grey tip compares compacting now with coming back to a cold cache, with a **Compact** button. A compaction reads the whole context, which is cheap only while it is still cached.
 - **Alerts in place**: after a model switch or an MCP change that will rewrite a warm cache, the line above the prompt turns amber and says so.
-- **Usage limits**: the 5-hour and weekly windows of a Pro or Max subscription, with when each resets.
-- **Cold-cache impact**: how many points of the 5-hour window the next message would add if the cache goes cold, drawn as a faint segment on the bar. With an API key, the same figure in dollars.
+- **Usage limits** (in the pane): the 5-hour and weekly windows of a Pro or Max subscription, with when each resets. When the cache is cold, the 5-hour bar shows what the next message adds as a faint segment. With an API key, dollars instead.
 - **Model switch preview**: what the first message on each other model would add, and a warning as soon as you switch.
 - **Switch confirmation**: asks before a model switch that would throw away a warm cache for more than $0.50 (configurable).
 - **MCP change warning**: flags a connected or dropped MCP server while the cache is warm, since the tool list is part of the cached prompt.
@@ -48,12 +48,12 @@ Answer `y` to add the marketplace, then choose a scope. The pane opens with your
 
 | Where | What you see |
 | --- | --- |
-| Above the prompt | `● Cache 55 min · 5h 62% · +6% if cold` and a **Details** button that opens the pane |
-| Above the prompt, cooling | `● Cache 8 min · … · Leaving? Compact first, come back for +0.4%` and a **Compact** button |
-| Above the prompt, cold | `○ Cache cold · 5h 62% · next message rewrites 187k (+6%)` |
+| Above the prompt | `● Cache warm · 55 min` and a **Details** button that opens the pane |
+| Above the prompt, cooling | `● Cache cooling · 8 min · Leaving? Compact first` and a **Compact** button |
+| Above the prompt, cold | `○ Cache cold · next message rewrites 187k (+6%)` |
 | Above the prompt, after a model switch | `● Switched to Sonnet 5.5 · cache rewrite +3%` |
 | Above the prompt, after an MCP change | `● MCP changed (+github) · likely cache rewrite +6%` |
-| Status line | `cache 55 min · 5h 62% · week 31%` |
+| Status line | `cache 55 min`, or `cache cold · next message +6%` |
 | Pane (**Context**) | Minutes left, 5-hour and weekly usage with reset times, one suggestion, other models on request, session summary |
 
 | Command | Does |
@@ -69,6 +69,7 @@ Change these in the config menu, or under `pluginConfigs.contextwatch` in `~/.cl
 
 | Setting | Default | Does |
 | --- | --- | --- |
+| `askWhenCold` | `true` | Before a message goes into a cold cache of 60k tokens or more, ask whether to send anyway, compact first, or start fresh. |
 | `confirmSwitchUsd` | `0.5` | Ask before a model switch that would rewrite a warm cache for more than this many dollars. `0` turns it off. |
 | `awayReminder` | `false` | Send one notice shortly before the cache lapses. |
 | `awayReminderMinutes` | `5` | How many minutes before the cache lapses the notice is sent. |

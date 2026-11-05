@@ -24,6 +24,9 @@ const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const
 
 export const PANE = 'contextwatch'
 
+// The content stays this many cells wide at most and centres in a wider pane.
+const CONTENT_CELLS = 56
+
 export async function openPane($: EngineInterface) {
   await $.ui.open({ id: PANE, title: 'Context' })
 }
@@ -68,9 +71,8 @@ export function registerPane(on: On) {
     const progress = isSvg ? (
       <els.Svg
         key="ttl"
-        source={barSvg(left / TTL_MS[last.ttl], INK_OF[state], 280, 4)}
+        source={barSvg(left / TTL_MS[last.ttl], INK_OF[state], 1000, 4)}
         alt={`${formatMinutes(left)} of ${ttlLabel(last.ttl)}`}
-        width={280}
         height={4}
       />
     ) : (
@@ -85,10 +87,8 @@ export function registerPane(on: On) {
 
       return (
         <Box key={key} flexDirection="column">
-          <Box flexDirection="row">
-            <Box width="50%">
-              <Text>{name}</Text>
-            </Box>
+          <Box flexDirection="row" justifyContent="space-between">
+            <Text>{name}</Text>
             <Text weight="semibold">{formatPercentUsed(w.percent)}</Text>
           </Box>
           {isSvg ? (
@@ -96,7 +96,6 @@ export function registerPane(on: On) {
               key={`bar-${key}`}
               source={usageSvg(used, extra / 100, usageInk(w.percent))}
               alt={`${formatPercentUsed(w.percent)} used`}
-              width={220}
               height={6}
             />
           ) : (
@@ -113,12 +112,13 @@ export function registerPane(on: On) {
 
     const usage = (() => {
       if (windows === null) {
-        return coldImpact === null ? null : (
-          <Text dimColor>If the cache goes cold, the next message costs {coldImpact}.</Text>
+        return state !== 'cold' || coldImpact === null ? null : (
+          <Text dimColor>The next message rewrites the cache: {coldImpact}.</Text>
         )
       }
 
-      const extra = state === 'cold' ? 0 : pointsOf(coldUsd, cal)
+      // The faint segment is what the next message adds, shown only when it will.
+      const extra = state === 'cold' ? pointsOf(coldUsd, cal) : 0
 
       return (
         <Box flexDirection="column" gap={1}>
@@ -127,13 +127,11 @@ export function registerPane(on: On) {
           </Text>
           {windows.fiveHour !== null && usageRow('five', '5-hour', windows.fiveHour, extra)}
           {windows.weekly !== null && usageRow('week', 'Weekly', windows.weekly, 0)}
-          <Text dimColor size="caption">
-            {coldImpact === null
-              ? 'Learning how much a message moves your 5-hour window.'
-              : state === 'cold'
-                ? `The next message rewrites the cache: about ${coldImpact} of the 5-hour window.`
-                : `If the cache goes cold, the next message adds about ${coldImpact} (the faint part).`}
-          </Text>
+          {state === 'cold' && coldImpact !== null && (
+            <Text dimColor size="caption">
+              The next message rewrites the cache: about {coldImpact} of the 5-hour window (the faint part).
+            </Text>
+          )}
         </Box>
       )
     })()
@@ -153,16 +151,9 @@ export function registerPane(on: On) {
         return <Text color="warning">MCP servers changed ({formatChange(change)}): the next message likely rewrites the cache.</Text>
       }
       if (advice !== null) {
-        const back = formatImpact(advice.backCold, windows, cal)
-        const stay = formatImpact(advice.stayCold, windows, cal)
-        const words =
-          back === null || stay === null
-            ? 'Stepping away? Compact now, while reading the context is still cheap.'
-            : `Stepping away? Compact now and come back for ${back} instead of ${stay}.`
-
         return (
           <Box flexDirection="column" gap={1}>
-            <Text dimColor>{words}</Text>
+            <Text dimColor>Stepping away? Compact now, while reading the context is still cheap.</Text>
             <Button key="compact" label="Compact" variant="secondary" onPress={() => compactNow($)} />
           </Box>
         )
@@ -175,13 +166,11 @@ export function registerPane(on: On) {
       ? switchOptions(list, time)
           .filter(o => !o.isCurrent)
           .map(o => (
-            <Box key={o.model} flexDirection="row">
-              <Box width="50%">
-                <Text dimColor>
-                  {o.label}
-                  {o.warmMs > 0 ? ` · warm ${formatMinutes(o.warmMs)}` : ''}
-                </Text>
-              </Box>
+            <Box key={o.model} flexDirection="row" justifyContent="space-between">
+              <Text dimColor>
+                {o.label}
+                {o.warmMs > 0 ? ` · warm ${formatMinutes(o.warmMs)}` : ''}
+              </Text>
               <Text>{formatImpact(o.cost, windows, cal) ?? '—'}</Text>
             </Box>
           ))
@@ -193,8 +182,11 @@ export function registerPane(on: On) {
       misses === 1 ? '1 miss' : `${misses} misses`,
     ].join(' · ')
 
+    const width = `${Math.min(100, Math.round((CONTENT_CELLS / Math.max(1, e.props.bodyColumns)) * 100))}%`
+
     return (
-      <Box flexDirection="column" gap={2}>
+      <Box flexDirection="column" alignItems="center">
+        <Box flexDirection="column" gap={2} width={width}>
         <Box flexDirection="column" gap={1}>
           <Box>
             <Text color={COLOR[state]}>{DOT[state]} </Text>
@@ -236,6 +228,7 @@ export function registerPane(on: On) {
         <Text dimColor size="caption">
           {session}
         </Text>
+        </Box>
       </Box>
     )
   })

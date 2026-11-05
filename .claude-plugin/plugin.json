@@ -8,6 +8,12 @@
   "license": "MIT",
   "types": "./types/index.d.ts",
   "userConfig": {
+    "askWhenCold": {
+      "type": "boolean",
+      "title": "Ask before sending into a cold cache",
+      "description": "When the cache is cold and the context is large, ask whether to send anyway, compact first, or start fresh.",
+      "default": true
+    },
     "confirmSwitchUsd": {
       "type": "number",
       "title": "Confirm model switches above (USD)",

@@ -28,6 +28,11 @@ type EngineOptions = {
   onStatus?: (text: string | undefined) => void
   onCompact?: () => void
   onToast?: (text: string) => void
+  // How the person answers a question; throwing stands for dismissing it.
+  answer?: (question: string) => string
+  onSubmit?: (text: string) => void
+  onClear?: () => void
+  onFill?: (text: string) => void
 }
 
 // Stands for the engine: each model request is answered with `usage`.
@@ -60,6 +65,33 @@ const engine = (on: On, options: EngineOptions = {}) => {
     options.onCompact?.()
 
     return { messages: SUMMARY, tokensBefore: 113_402, tokensAfter: 15_000, usage: { ...usage, output_tokens: 6_000 } }
+  })
+  // $.ui.ask runs the AskUserQuestion tool: the person's answer, or a refusal for a dismissal.
+  on('tool.call', { tool: 'AskUserQuestion' }, (_, e) => {
+    const question = e.questions[0]?.question ?? ''
+    let answer: string
+    try {
+      answer = options.answer?.(question) ?? 'Send anyway'
+    } catch {
+      return { deny: 'dismissed' }
+    }
+
+    return { result: { questions: e.questions, answers: { [question]: answer } } }
+  })
+  on('prompt.submit', (_, e) => {
+    options.onSubmit?.(e.text)
+
+    return { text: e.text }
+  })
+  on('prompt.fill', (_, e) => {
+    options.onFill?.(e.text)
+
+    return { isFilled: true } as never
+  })
+  on('command.run', { command: 'clear' }, () => {
+    options.onClear?.()
+
+    return { text: '' }
   })
   // What the engine draws where the plugin draws nothing.
   on('ui.render', ($, e) => {
@@ -109,7 +141,7 @@ test('a response starts the countdown', async ($, on) => {
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const band = await $.ui.mount({ plugin: 'contextwatch', surface, component: 'AbovePrompt', props: { hasSurvey: false } as never })
-    expect((await band.find({ type: 'Text', text: /Cache 48 min/ }))?.text).toMatch(/Cache 48 min · 5h 40%/)
+    expect((await band.find({ type: 'Text', text: /^Cache/ }))?.text).toBe('Cache warm · 48 min ')
     expect(await band.find({ type: 'Button', key: 'details' })).toBeDefined()
     await band.unmount()
   }
@@ -164,7 +196,8 @@ test('the pane shows the countdown, the usage windows and the models on request'
     expect((await pane.find({ type: 'Text', text: /^55 min$/ }))?.text).toBe('55 min')
     expect(await pane.find({ type: 'Text', text: /^5-hour$/ })).toBeDefined()
     expect((await pane.find({ type: 'Text', text: /^40%$/ }))?.text).toBe('40%')
-    expect(await pane.find({ type: 'Text', text: /^Learning/ })).toBeDefined()
+    // Warm: no figure for a cold cache that has not happened.
+    expect(await pane.find({ type: 'Text', text: /rewrites the cache/ })).toBeUndefined()
 
     // The model comparison stays closed until asked for.
     expect(await pane.find({ type: 'Text', text: /^Sonnet 5\.5/ })).toBeUndefined()
@@ -261,7 +294,7 @@ test('an MCP server change while warm is flagged in the band', async ($, on) => 
   await after.unmount()
 })
 
-test('the status line carries the countdown and both usage windows', async ($, on) => {
+test('the status line says only the cache state, with a cost once cold', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
   const lines: (string | undefined)[] = []
   engine(on, { onStatus: text => lines.push(text) })
@@ -270,7 +303,10 @@ test('the status line carries the countdown and both usage windows', async ($, o
   await drain($.turn.step(STEP))
   await clock.advance(5 * MIN)
 
-  expect(lines.at(-1)).toBe('cache 55 min · 5h 40% · week 20%')
+  expect(lines.at(-1)).toBe('cache 55 min')
+
+  await clock.advance(56 * MIN)
+  expect(lines.at(-1)).toBe('cache cold')
 })
 
 test('a model switch shows the line above the prompt', async ($, on) => {
@@ -346,9 +382,10 @@ test('the usage a cold cache would add is learned from the spend', async ($, on)
   u = { usd: 3, five: 44, week: 21 }
   await clock.advance(MIN)
 
-  // A cold rewrite of 113k tokens on Opus 5.5 is ~$0.91, so ~1.8 points.
+  // Once cold, a rewrite of 113k tokens on Opus 5.5 is ~$0.91, so ~1.8 points.
+  await clock.advance(61 * MIN)
   const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
-  expect((await band.find({ type: 'Text', text: /Cache/ }))?.text).toMatch(/5h 44% · \+1\.8% if cold/)
+  expect((await band.find({ type: 'Text', text: /Cache/ }))?.text).toMatch(/Cache cold · next message rewrites 113k \(\+1\.8%\)/)
   await band.unmount()
 })
 
@@ -361,8 +398,96 @@ test('with an API key, dollars stand in for usage', async ($, on) => {
   await drain($.turn.step(STEP))
   await clock.advance(5 * MIN)
 
-  expect(lines.at(-1)).toBe('cache 55 min · ~$0.91 if cold')
+  expect(lines.at(-1)).toBe('cache 55 min')
+
+  await clock.advance(56 * MIN)
+  expect(lines.at(-1)).toBe('cache cold · next message ~$0.91')
   const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
-  expect((await band.find({ type: 'Text', text: /Cache/ }))?.text).toMatch(/Cache 55 min · ~\$0\.91 if cold/)
+  expect((await band.find({ type: 'Text', text: /Cache/ }))?.text).toMatch(/Cache cold · next message rewrites 113k \(~\$0\.91\)/)
   await band.unmount()
+})
+
+const PROMPT = { text: 'next question', origin: { kind: 'composer' as const }, wait: false }
+
+test('sending into a large cold cache asks first, once', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const asked: string[] = []
+  const sent: string[] = []
+  engine(on, { answer: q => (asked.push(q), 'Send anyway'), onSubmit: t => sent.push(t) })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await drain($.turn.step(STEP))
+
+  // Warm: no question.
+  await $.prompt.submit(PROMPT)
+  expect(asked.length).toBe(0)
+
+  await clock.advance(61 * MIN)
+  await $.prompt.submit(PROMPT)
+  expect(asked.length).toBe(1)
+  expect(asked[0]).toMatch(/cache is cold: this message rewrites 113k tokens/)
+  expect(sent.length).toBe(2)
+
+  // Same cold spell: not asked again.
+  await $.prompt.submit(PROMPT)
+  expect(asked.length).toBe(1)
+})
+
+test('start fresh clears, then sends the message; a failed compact still sends it', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  let reply = 'Start fresh, then send'
+  let cleared = 0
+  const sent: string[] = []
+  engine(on, { answer: () => reply, onClear: () => cleared++, onSubmit: t => sent.push(t) })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await drain($.turn.step(STEP))
+  await clock.advance(61 * MIN)
+  const held = await $.prompt.submit(PROMPT)
+  expect(held.drop).toMatch(/Starting fresh/)
+  await clock.settle()
+  expect(cleared).toBe(1)
+  expect(sent).toEqual(['next question'])
+
+  // The kit cannot run an argless compaction; the message must still go through.
+  reply = 'Compact, then send'
+  await drain($.turn.step(STEP))
+  await clock.advance(61 * MIN)
+  await $.prompt.submit(PROMPT)
+  await clock.settle()
+  expect(sent.length).toBe(2)
+})
+
+test('dismissing the question keeps the message unsent', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const filled: string[] = []
+  const sent: string[] = []
+  engine(on, {
+    answer: () => {
+      throw new Error('dismissed')
+    },
+    onFill: t => filled.push(t),
+    onSubmit: t => sent.push(t),
+  })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await drain($.turn.step(STEP))
+  await clock.advance(61 * MIN)
+  const result = await $.prompt.submit(PROMPT)
+
+  expect(result.drop).toMatch(/back in the prompt/)
+  expect(filled).toEqual(['next question'])
+  expect(sent.length).toBe(0)
+})
+
+test('the question can be turned off', { options: { askWhenCold: false } }, async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const sent: string[] = []
+  engine(on, { onSubmit: t => sent.push(t) })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await drain($.turn.step(STEP))
+  await clock.advance(61 * MIN)
+  await $.prompt.submit(PROMPT)
+  expect(sent.length).toBe(1)
 })

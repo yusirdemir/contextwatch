@@ -8,7 +8,7 @@ import { contextTokens, formatTokens } from '../core/metrics'
 import { isSameModel, modelLabel } from '../core/pricing'
 import { formatChange } from '../core/tools'
 import { formatMinutes, remainingMs, warmth } from '../core/ttl'
-import { formatImpact, formatPercentUsed } from '../core/usage'
+import { formatImpact } from '../core/usage'
 import { compactNow } from '../sources/compact'
 import { openPane } from './pane'
 import { COLOR, DOT } from './theme'
@@ -66,9 +66,6 @@ export function registerBand(on: On) {
   })
 }
 
-// " · +6% if cold", or nothing while the impact is unknown.
-const part = (impact: string | null, suffix = '') => (impact === null ? '' : ` · ${impact}${suffix}`)
-
 // " +6%" straight after the words it measures.
 const after = (impact: string | null) => (impact === null ? '' : ` ${impact}`)
 
@@ -88,26 +85,17 @@ const lineFor = ({ list, time, model, change, stats, windows, cal }: Inputs): Li
     return { dot: '●', color: 'warning', words: `MCP changed (${formatChange(change)}) · likely cache rewrite${after(cold)}` }
   }
 
-  const usage = windows?.fiveHour == null ? '' : ` · 5h ${formatPercentUsed(windows.fiveHour.percent)}`
-
+  // A figure only for what is true now: a cold cache costs the next message.
   if (state === 'cold') {
-    return { dot: DOT.cold, color: COLOR.cold, words: `Cache cold${usage} · next message rewrites ${tokens}${cold === null ? '' : ` (${cold})`}` }
+    return { dot: DOT.cold, color: COLOR.cold, words: `Cache cold · next message rewrites ${tokens}${cold === null ? '' : ` (${cold})`}` }
   }
 
-  const words = `Cache ${formatMinutes(remainingMs(last, time))}${usage}${part(cold, ' if cold')}`
+  const words = `Cache ${state === 'cooling' ? 'cooling' : 'warm'} · ${formatMinutes(remainingMs(last, time))}`
 
   // Cooling is the moment to compact: reading the context is still cheap.
   const advice = state === 'cooling' ? compactAdvice(list, time, stats) : null
   if (advice !== null) {
-    const back = formatImpact(advice.backCold, windows, cal)
-
-    return {
-      dot: DOT[state],
-      color: COLOR[state],
-      words,
-      tip: back === null ? 'Leaving? Compact first' : `Leaving? Compact first, come back for ${back}`,
-      canCompact: true,
-    }
+    return { dot: DOT[state], color: COLOR[state], words, tip: 'Leaving? Compact first', canCompact: true }
   }
 
   return { dot: DOT[state], color: COLOR[state], words }

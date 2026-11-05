@@ -6,11 +6,13 @@ export const INK = { track: '#8b8b8b', warm: '#3fb950', cooling: '#d29922', mute
 const round = (n: number) => Math.round(n * 10) / 10
 
 // A thin horizontal bar filled to `fraction` (0 to 1).
-export const barSvg = (fraction: number, color: string, width = 120, height = 6): string => {
+// Drawn wide and stretched: the surface narrows it to the slot, so it fills
+// whatever width the pane has.
+export const barSvg = (fraction: number, color: string, width = 1000, height = 6): string => {
   const fill = round(Math.max(0, Math.min(1, fraction)) * width)
   const r = height / 2
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">` +
     `<rect width="${width}" height="${height}" rx="${r}" fill="${INK.track}" fill-opacity="0.25"/>` +
     (fill > 0 ? `<rect width="${Math.max(fill, height)}" height="${height}" rx="${r}" fill="${color}" fill-opacity="0.9"/>` : '') +
     '</svg>'
@@ -25,13 +27,13 @@ export const barText = (fraction: number, cells = 12): string => {
 
 // A usage bar: `used` filled, and `extra` beyond it drawn faint, for what a
 // cache rewrite would add. Both are fractions of the window (0 to 1).
-export const usageSvg = (used: number, extra: number, color: string, width = 220, height = 6): string => {
+export const usageSvg = (used: number, extra: number, color: string, width = 1000, height = 6): string => {
   const clamp = (n: number) => Math.max(0, Math.min(1, n))
   const a = round(clamp(used) * width)
   const b = round(clamp(used + extra) * width) - a
   const r = height / 2
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">` +
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">` +
     `<clipPath id="r"><rect width="${width}" height="${height}" rx="${r}"/></clipPath>` +
     `<g clip-path="url(#r)">` +
     `<rect width="${width}" height="${height}" fill="${INK.track}" fill-opacity="0.25"/>` +

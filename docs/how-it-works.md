@@ -96,7 +96,7 @@ contextwatch learns that from the session itself. It keeps an anchor (session co
 impact of a cold cache = cold rewrite (list price) × points per dollar
 ```
 
-The pane draws that impact as a faint segment past the 5-hour fill. Until the first sample, the `+%` figures are left out. Other sessions using the same account at the same time move the window too, which makes the estimate high rather than low.
+When the cache is cold, the pane draws that impact as a faint segment past the 5-hour fill. While it is warm, no hypothetical figure is shown. Until the first sample, the `+%` figures are left out. Other sessions using the same account at the same time move the window too, which makes the estimate high rather than low.
 
 With an API key there are no windows; contextwatch shows dollars instead.
 
@@ -124,6 +124,16 @@ Claude Code raises `PreModelSwitch` before a switch, with `prompt_cache_warm` an
 
 The tool list is part of the cached prompt prefix, so connecting or dropping an MCP server rewrites the cache on the next message. After every response contextwatch records the MCP servers behind the tool list (`mcp__<server>__<tool>`). Each tick compares the current list against it; a difference while the cache is warm shows a warning in the band and the pane and a one-time notice. The next response resets the baseline.
 
+### Cold-send question
+
+When `askWhenCold` is on and a typed message is about to go into a cold cache of 60k tokens or more, `prompt.submit` asks once per cold spell:
+
+- **Send anyway**: the message goes as typed.
+- **Compact, then send** / **Start fresh, then send**: compacting or clearing cannot run inside `prompt.submit` (it would wait on the turn the hook holds), so the message is held, the action runs right after the hook returns, and the message is then submitted as the person's own words. Attachments on the held message are not carried over.
+- Dismissing the question keeps the message unsent and puts it back in the prompt box.
+
+Slash commands and meta prompts pass untouched.
+
 ### Away reminder
 
 When `awayReminder` is on, the tick sends one notice per response once the time left drops below `awayReminderMinutes`.
@@ -134,4 +144,4 @@ A 30-second ticker writes the engine clock to `contextwatch.now` in session stat
 
 ## Pane layout
 
-The pane shows one large figure (minutes left) with a thin progress bar, the next message's cost now and if cold, and at most one suggestion: a model switch or MCP warning, or the compact tip while cooling. The model comparison stays closed until asked for. The desktop app draws the progress bar as SVG in a mid-tone colour that reads on light and dark backgrounds; the terminal draws it with block characters.
+The pane shows one large figure (minutes left) with a thin progress bar, the usage windows, and at most one suggestion: a model switch or MCP warning, or the compact tip while cooling. The model comparison stays closed until asked for. The content is at most 56 cells wide and centres in a wider pane; the bars fill that width. The desktop app draws the progress bar as SVG in a mid-tone colour that reads on light and dark backgrounds; the terminal draws it with block characters.

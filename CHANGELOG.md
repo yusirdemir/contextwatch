@@ -14,6 +14,9 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 - What a cold cache would add to the 5-hour window, learned from the session's own spend and drawn as a faint segment on the bar; dollars with an API key.
 - Cost of the first message after switching to each other model, and a warning in the band right after a switch.
 - Per-model cache tracking: a model used earlier in the session that is still warm is priced as a partial hit.
+- Question before sending into a large cold cache: send anyway, compact then send, or start fresh then send (`askWhenCold`).
+- Band and status line show the cache state only; a cost appears once the cache is cold or a switch will rewrite it. Usage windows live in the pane.
+- Pane content centres and its bars fill the width in a wide pane.
 - Confirmation before a model switch that would rewrite a warm cache for more than `confirmSwitchUsd` (default $0.50).
 - Warning when MCP servers change while the cache is warm.
 - Optional away reminder before the cache lapses (`awayReminder`, `awayReminderMinutes`).
