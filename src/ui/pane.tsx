@@ -3,7 +3,7 @@ import { atom, read, update } from 'claude-code'
 
 import type { Limits, LimitWindow } from '../../types'
 import { compactAdvice } from '../core/compact'
-import { floorCost, nextQuestionCost, stayCost, switchOptions } from '../core/forecast'
+import { floorCost, stayCost, switchOptions } from '../core/forecast'
 import { cacheDropped, contextTokens, formatPercent, formatTokens, hitRate } from '../core/metrics'
 import { isSameModel, modelLabel } from '../core/pricing'
 import { formatChange } from '../core/tools'
@@ -59,7 +59,6 @@ export function registerPane(on: On) {
     const state = warmth(last, time)
     const left = remainingMs(last, time)
     const coldUsd = stayCost(list, time).cold
-    const floorUsd = floorCost(list, time)
     const misses = list.filter((s, i) => i > 0 && cacheDropped(s)).length
     const isSwitched = model !== null && !isSameModel(model, last.model)
     const advice = state === 'cooling' ? compactAdvice(list, time, stats) : null
@@ -108,21 +107,27 @@ export function registerPane(on: On) {
     }
 
     const usage = (() => {
-      // What the next message adds: a cache rewrite when cold, otherwise a
-      // question like the recent ones, never less than one read of the context.
-      const nextUsd = state === 'cold' ? coldUsd : nextQuestionCost(list, time)
-      const floor = state === 'cold' ? null : formatImpact(floorUsd, windows, cal)
-      const next = formatImpact(nextUsd, windows, cal)
+      // The least the next message adds, from the context and the cache alone.
+      const floorUsd = floorCost(list, time)
+      const next = formatImpact(floorUsd, windows, cal)
+      const context = contextTokens(last)
+      const how =
+        state === 'cold'
+          ? `The cache is cold: all ${formatTokens(context)} tokens are written again.`
+          : `${formatTokens(context - last.outputTokens)} tokens read from the cache, the last answer's ${formatTokens(last.outputTokens)} written.`
 
       if (windows === null) {
         return next === null ? null : (
-          <Text dimColor>
-            {state === 'cold' ? `Next message rewrites the cache: ${next}.` : `Next question: about ${next}${floor === null ? '' : `, at least ${floor}`}.`}
-          </Text>
+          <Box flexDirection="column">
+            <Text dimColor>Next message: at least {next}</Text>
+            <Text dimColor size="caption">
+              {how}
+            </Text>
+          </Box>
         )
       }
 
-      const points = pointsOf(nextUsd, cal)
+      const points = pointsOf(floorUsd, cal)
       const extra = points ?? 0
 
       return (
@@ -133,10 +138,14 @@ export function registerPane(on: On) {
           {windows.fiveHour !== null && usageRow('five', '5-hour', windows.fiveHour, extra)}
           {windows.weekly !== null && usageRow('week', 'Weekly', windows.weekly, 0)}
           {next !== null && points !== null && windows.fiveHour !== null && (
-            <Text dimColor size="caption">
-              {state === 'cold' ? `Next message rewrites the cache: ${next}` : `Next question: ${next}`}
-              {floor !== null && floor !== next ? ` (at least ${floor})` : ''} · {formatLanding(windows.fiveHour, points)}
-            </Text>
+            <Box flexDirection="column">
+              <Text dimColor size="caption">
+                Next message: at least {next} · {formatLanding(windows.fiveHour, points)}
+              </Text>
+              <Text dimColor size="caption">
+                {how} Your message, tool calls and the answer come on top.
+              </Text>
+            </Box>
           )}
           {next === null && (
             <Text dimColor size="caption">

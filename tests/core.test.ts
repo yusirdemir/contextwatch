@@ -4,7 +4,7 @@ import type { Snapshot } from '../types'
 import { compactAdvice } from '../src/core/compact'
 import { explainLast } from '../src/core/explain'
 import { cacheDropped, contextTokens, formatTokens, hitRate } from '../src/core/metrics'
-import { floorCost, nextQuestionCost, questionCost, stayCost, switchOptions } from '../src/core/forecast'
+import { floorCost, stayCost, switchOptions } from '../src/core/forecast'
 import { formatUsd, modelLabel, priceOf, promptCost, responseCost } from '../src/core/pricing'
 import { diffServers, formatChange, serversOf } from '../src/core/tools'
 import { calibrate, formatImpact, formatLanding, formatUntil, parseLimits, pointsOf } from '../src/core/usage'
@@ -110,7 +110,7 @@ test('a warm cache makes the next message cheap', () => {
   expect(near(promptCost('claude-opus-5-5', 100_000, 0, '5m'), 0.5)).toBe(true)
 
   const cost = stayCost([snap({ at: 0 })], 10 * MIN)
-  expect(near(cost.warm, 0.0200804)).toBe(true)
+  expect(near(cost.warm, (100_302 * 0.2 + 100 * 4 * 2) / 1e6)).toBe(true)
   expect(near(cost.cold, 0.803216)).toBe(true)
   expect(stayCost([snap({ at: 0 })], 61 * MIN).warm).toBeNull()
 })
@@ -201,28 +201,13 @@ test('usage windows and what a dollar moves them', () => {
   expect(formatUntil(3 * 24 * 60 * MIN + 4 * 60 * MIN, 0)).toBe('3 d 4 h')
 })
 
-test('a question costs the sum of its requests, averaged over recent turns', () => {
-  const one = responseCost(snap())!
-  // Turn a took two requests, turn b one: average (2 + 1) / 2 requests' worth.
-  const list = [snap({ turnId: 'a' }), snap({ turnId: 'a' }), snap({ turnId: 'b' })]
-  expect(near(questionCost(list), (one * 3) / 2)).toBe(true)
-  // Only the last three turns count.
-  const many = ['a', 'b', 'c', 'd'].map(turnId => snap({ turnId }))
-  expect(near(questionCost([snap({ turnId: 'z', cacheReadTokens: 900_000 }), ...many]), one)).toBe(true)
-  expect(questionCost([snap()])).toBeNull()
-})
-
-test('the next question costs at least one read of the context', () => {
-  const list = [snap({ at: 0, turnId: 'a' })]
-  // One cache read of 100,402 tokens on Opus 5.5.
-  expect(near(floorCost(list, MIN), 100_402 * 0.2 / 1e6)).toBe(true)
-  // Cold, the floor is the rewrite.
-  expect(near(floorCost(list, 61 * MIN), 100_402 * 4 * 2 / 1e6)).toBe(true)
-  // The recent turn cost more than the floor, so it sets the estimate.
-  expect(near(nextQuestionCost(list, MIN), responseCost(snap())!)).toBe(true)
-  // A cheap recent turn never takes the estimate below the floor.
-  const cheap = [snap({ at: 0, turnId: 'a', cacheReadTokens: 0, cacheCreationTokens: 0, inputTokens: 10, outputTokens: 0 }), snap({ at: 0 })]
-  expect(near(nextQuestionCost(cheap, MIN), floorCost(cheap, MIN)!)).toBe(true)
+test('the next message costs at least what the context and the cache say', () => {
+  const list = [snap({ at: 0 })]
+  // Warm: the last prompt (100,302 tokens) read, the last answer (100) written at 2×.
+  expect(near(floorCost(list, MIN), (100_302 * 0.2 + 100 * 4 * 2) / 1e6)).toBe(true)
+  // Cold: all 100,402 tokens written again.
+  expect(near(floorCost(list, 61 * MIN), (100_402 * 4 * 2) / 1e6)).toBe(true)
+  expect(floorCost([], MIN)).toBeNull()
 
   const cal = { anchor: null, percentPerUsd: 5 }
   expect(pointsOf(0.4, cal)).toBe(2)

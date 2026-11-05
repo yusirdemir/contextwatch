@@ -3,7 +3,7 @@ import { atom, read } from 'claude-code'
 
 import type { Calibration, CompactStats, Limits, Snapshot, ToolChange } from '../../types'
 import { compactAdvice } from '../core/compact'
-import { nextQuestionCost, stayCost, switchOptions } from '../core/forecast'
+import { floorCost, stayCost, switchOptions } from '../core/forecast'
 import { contextTokens, formatTokens } from '../core/metrics'
 import { isSameModel, modelLabel } from '../core/pricing'
 import { formatChange } from '../core/tools'
@@ -90,10 +90,9 @@ const lineFor = ({ list, time, model, change, stats, windows, cal }: Inputs): Li
     return { dot: DOT.cold, color: COLOR.cold, words: `Cache cold · next message rewrites ${tokens}${cold === null ? '' : ` (${cold})`}` }
   }
 
-  // While warm, what the next question will add, judged by the recent ones.
-  // It grows with the context, since every request re-reads all of it.
-  const next = formatImpact(nextQuestionCost(list, time), windows, cal)
-  const cost = next === null ? '' : ` · next question ${next}`
+  // The least the next message adds, from the context and the cache alone.
+  const floor = formatImpact(floorCost(list, time), windows, cal)
+  const cost = floor === null ? '' : ` · next message at least ${floor}`
   const words = `Cache ${state === 'cooling' ? 'cooling' : 'warm'} · ${formatMinutes(remainingMs(last, time))}${cost}`
 
   // Cooling is the moment to compact: reading the context is still cheap.

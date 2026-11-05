@@ -53,18 +53,18 @@ The live usage figures do not say which TTL an entry was written with. contextwa
 
 A miss right after a model change says nothing about the TTL and is ignored.
 
-## Next question
+## Next message
 
-Every request of a turn is recorded with its `turnId`, and a question's cost is the sum of its requests at list price. The next question is estimated as:
+The figure is a floor, worked out from the context and the cache alone, not from past questions:
 
 ```text
-floor     = context × cacheRead            one request that only reads the context (warm)
-          = context × input × write mult   the rewrite (cold)
-typical   = average of the last three questions
-next      = max(typical, floor)
+warm   = (context − last answer) × cacheRead  +  last answer × input × write multiplier
+cold   = context × input × write multiplier
 ```
 
-The band shows `next` as points of the 5-hour window; the pane adds where the window lands (`41% → 43%`) and draws it as a faint segment on the bar, with the floor when it differs. Each request re-reads the whole context, so both grow as the conversation grows and drop after a compaction.
+While warm, the last prompt is still cached and is read; the last answer joined the context after it was cached, so it is written. Once cold, everything is written. Your new message, any tool calls and the answer come on top, which is why it is "at least".
+
+The band shows it as points of the 5-hour window; the pane adds where the window lands (`41% → 42%`) and draws it as a faint segment on the bar. Both grow as the conversation grows and drop after a compaction.
 
 ## Explaining a miss
 

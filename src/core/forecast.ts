@@ -1,6 +1,6 @@
 import type { Snapshot } from '../../types'
 import { contextTokens } from './metrics'
-import { isSameModel, modelLabel, promptCost, responseCost, SWITCH_MODELS } from './pricing'
+import { isSameModel, modelLabel, promptCost, SWITCH_MODELS } from './pricing'
 import { remainingMs } from './ttl'
 
 export type Option = {
@@ -32,7 +32,7 @@ export const stayCost = (list: readonly Snapshot[], now: number): { warm: number
   const isWarm = remainingMs(last, now) > 0
 
   return {
-    warm: isWarm ? promptCost(last.model, context, context, last.ttl) : null,
+    warm: isWarm ? promptCost(last.model, context, context - last.outputTokens, last.ttl) : null,
     cold: promptCost(last.model, context, 0, last.ttl),
   }
 }
@@ -65,39 +65,16 @@ export const switchOptions = (list: readonly Snapshot[], now: number): Option[] 
   })
 }
 
-// What a question has cost lately: the average of the last few turns, each the
-// sum of its requests. It grows with the context, since every request re-reads it.
-export const questionCost = (list: readonly Snapshot[], turns = 3): number | null => {
-  const totals = new Map<string, number>()
-  for (const s of list) {
-    if (s.turnId === undefined) continue
-    const cost = responseCost(s)
-    if (cost === null) continue
-    totals.set(s.turnId, (totals.get(s.turnId) ?? 0) + cost)
-  }
-
-  const recent = [...totals.values()].slice(-turns)
-  if (recent.length === 0) return null
-
-  return recent.reduce((a, b) => a + b, 0) / recent.length
-}
-
-// The least any next question can cost: one request that reads the whole
-// context from the cache. Tool calls and longer answers only add to it.
+// The least the next message can cost, from the context and the cache
+// alone: the last prompt is read from the cache, and the last answer, which
+// joined the context after it was cached, is written. Cold, all of it is
+// written. Your new message, tool calls and the answer come on top.
 export const floorCost = (list: readonly Snapshot[], now: number): number | null => {
   const last = list.at(-1)
   if (last === undefined) return null
 
   const context = contextTokens(last)
+  const cached = remainingMs(last, now) > 0 ? context - last.outputTokens : 0
 
-  return remainingMs(last, now) > 0 ? promptCost(last.model, context, context, last.ttl) : promptCost(last.model, context, 0, last.ttl)
-}
-
-// What the next question will add while the cache is warm: like the recent
-// ones, and never less than the floor.
-export const nextQuestionCost = (list: readonly Snapshot[], now: number): number | null => {
-  const floor = floorCost(list, now)
-  const typical = questionCost(list)
-
-  return typical === null ? floor : Math.max(typical, floor ?? 0)
+  return promptCost(last.model, context, cached, last.ttl)
 }
