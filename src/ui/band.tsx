@@ -1,4 +1,4 @@
-import type { On } from 'claude-code'
+import type { Color, On } from 'claude-code'
 import { atom, read } from 'claude-code'
 
 import type { Snapshot, ToolChange } from '../../types'
@@ -6,56 +6,61 @@ import { stayCost, switchOptions } from '../core/forecast'
 import { contextTokens, formatTokens } from '../core/metrics'
 import { formatUsd, isSameModel, modelLabel } from '../core/pricing'
 import { formatChange } from '../core/tools'
-import { warmth } from '../core/ttl'
+import { formatMinutes, remainingMs, warmth } from '../core/ttl'
 import { openPane } from './pane'
+import { COLOR, DOT } from './theme'
 
 const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
 const activeModel = atom({ plugin: 'contextwatch', key: 'activeModel' } as const, null)
 const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, null)
 
-// The line above the prompt appears only for what needs a decision before
-// sending: a model switch or an MCP change that will rewrite a warm cache.
-// Everything else lives in the status line and the pane.
+type Line = { dot: string; color: Color; words: string }
+
+// One quiet line above the prompt with the Details button. An alert that
+// needs a decision before sending (a model switch, an MCP change) takes its place.
 export function registerBand(on: On) {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const list = await read($, history)
-    if (e.props.hasSurvey) return next(e)
+    if (e.props.hasSurvey || list.length === 0) return next(e)
 
-    const words = alertFor(list, await read($, now), await read($, activeModel), await read($, toolChange))
-    if (words === null) return next(e)
-
+    const line = lineFor(list, await read($, now), await read($, activeModel), await read($, toolChange))
     const { Box, Button, Text } = $.ui.resolve(e)
 
     return (
       <Box>
-        <Text color="warning">● </Text>
-        <Text dimColor>{words} </Text>
+        <Text color={line.color}>{line.dot} </Text>
+        <Text dimColor>{line.words} </Text>
         <Button key="details" label="Details" onPress={() => openPane($)} />
       </Box>
     )
   })
 }
 
-const alertFor = (list: Snapshot[], time: number, model: string | null, change: ToolChange | null): string | null => {
-  const last = list.at(-1)
-  if (last === undefined || warmth(last, time) === 'cold') return null
+const price = (cost: number | null) => (cost === null ? '' : ` ~${formatUsd(cost)}`)
 
+const lineFor = (list: Snapshot[], time: number, model: string | null, change: ToolChange | null): Line => {
+  const last = list.at(-1)!
+  const state = warmth(last, time)
   const tokens = formatTokens(contextTokens(last))
+  const cost = stayCost(list, time)
 
-  if (model !== null && !isSameModel(model, last.model)) {
-    const cost = switchOptions(list, time).find(o => isSameModel(o.model, model))?.cost ?? null
-    const price = cost === null ? '' : ` ~${formatUsd(cost)}`
+  if (state !== 'cold' && model !== null && !isSameModel(model, last.model)) {
+    const switchCost = switchOptions(list, time).find(o => isSameModel(o.model, model))?.cost ?? null
 
-    return `Switched to ${modelLabel(model)} · cache rewrite ${tokens} tokens${price}`
+    return { dot: '●', color: 'warning', words: `Switched to ${modelLabel(model)} · cache rewrite ${tokens} tokens${price(switchCost)}` }
   }
 
-  if (change !== null) {
-    const cost = stayCost(list, time).cold
-    const price = cost === null ? '' : ` ~${formatUsd(cost)}`
-
-    return `MCP servers changed (${formatChange(change)}) · likely cache rewrite${price}`
+  if (state !== 'cold' && change !== null) {
+    return { dot: '●', color: 'warning', words: `MCP servers changed (${formatChange(change)}) · likely cache rewrite${price(cost.cold)}` }
   }
 
-  return null
+  if (state === 'cold') {
+    return { dot: DOT.cold, color: COLOR.cold, words: `Cache cold · rewrite ${tokens} tokens${price(cost.cold)}` }
+  }
+
+  const readPart = cost.warm === null ? '' : ` · cache read${price(cost.warm)}`
+  const coldPart = cost.cold === null ? '' : ` · cold${price(cost.cold)}`
+
+  return { dot: DOT[state], color: COLOR[state], words: `Cache ${formatMinutes(remainingMs(last, time))} left${readPart}${coldPart}` }
 }

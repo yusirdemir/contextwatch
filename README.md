@@ -9,16 +9,14 @@ Claude Code caches your conversation for a limited time, usually one hour. While
 
 contextwatch shows how much time is left and what the next message costs, so you know before you send.
 
-Under the prompt, in the status line:
-
 ```text
-cache 55 min · read $0.06 · cold $2.55
+● Cache 55 min left · cache read ~$0.06 · cold ~$2.55   [Details]
 ```
 
 ## Features
 
-- **Countdown**: minutes left before the cache lapses, in the status line under the prompt. It updates every 30 seconds and never shows seconds, so it stays out of the way.
-- **Alerts only when needed**: a line above the prompt appears only after a model switch or an MCP change that will rewrite a warm cache.
+- **Countdown**: minutes left before the cache lapses, above the prompt and in the status line. It updates every 30 seconds and never shows seconds, so it stays out of the way.
+- **Alerts in place**: after a model switch or an MCP change that will rewrite a warm cache, the line above the prompt turns amber and says so.
 - **Cache cost**: what the context costs on the next message, as a cache read while warm and as a cache rewrite once cold.
 - **Model switch preview**: the cache cost of the first message on each other model, and a warning as soon as you switch.
 - **Switch confirmation**: asks before a model switch that would throw away a warm cache for more than $0.50 (configurable).
@@ -48,9 +46,11 @@ Answer `y` to add the marketplace, then choose a scope. The pane opens with your
 
 | Where | What you see |
 | --- | --- |
-| Status line (always) | `cache 55 min · read $0.06 · cold $2.55` |
-| Above the prompt, after a model switch | `● Switched to Sonnet 5.5 · cache rewrite 187k tokens ~$0.75` and a **Details** button |
+| Above the prompt | `● Cache 55 min left · cache read ~$0.06 · cold ~$2.55` and a **Details** button that opens the pane |
+| Above the prompt, cold | `○ Cache cold · rewrite 187k tokens ~$2.63` |
+| Above the prompt, after a model switch | `● Switched to Sonnet 5.5 · cache rewrite 187k tokens ~$0.75` |
 | Above the prompt, after an MCP change | `● MCP servers changed (+github) · likely cache rewrite ~$1.50` |
+| Status line | `cache 55 min · read $0.06 · cold $2.55` |
 | Pane (**Context**) | Countdown, cache cost, switch costs per model, context chart, session cost |
 
 | Command | Does |

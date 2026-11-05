@@ -78,10 +78,10 @@ test('a response starts the countdown', async ($, on) => {
   expect(ran.text).toMatch(/cache read ~\$0\.02/)
   expect(ran.text).toMatch(/cache rewrite ~\$0\.9/)
 
-  // Nothing needs a decision, so the line above the prompt stays empty.
   for (const surface of ['terminal', 'desktop'] as const) {
     const band = await $.ui.mount({ plugin: 'contextwatch', surface, component: 'AbovePrompt', props: { hasSurvey: false } as never })
-    expect(await band.find({ type: 'Text', text: /Cache/ })).toBeUndefined()
+    expect((await band.find({ type: 'Text', text: /48 min left/ }))?.text).toMatch(/cache read ~\$0\.02 · cold ~\$0\.91/)
+    expect(await band.find({ type: 'Button', key: 'details' })).toBeDefined()
     await band.unmount()
   }
 })
