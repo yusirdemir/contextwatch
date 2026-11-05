@@ -18,35 +18,58 @@ export const parseLimits = (rows: readonly { kind: string; percentUsed: number; 
 }
 
 // The usage windows report a percentage, not dollars or tokens. To say what a
-// cache rewrite does to the 5-hour window, contextwatch learns how many
-// percent each dollar of list price moves it, from this session's own spend.
-// Other sessions using the same account at the same time push the figure up,
-// so it is an estimate and is smoothed over several samples.
+// message does to the 5-hour window, contextwatch learns how many points each
+// dollar of list price moves it.
+//
+// The window is the account's, so the dollars must be too: every session that
+// runs contextwatch adds its spend to a shared ledger (`totalSpend`), and the
+// ratio divides the window's move by the ledger's. Spend the ledger cannot see
+// (claude.ai, a session without the mod) only ever pushes a sample up, so the
+// ratio is the lowest of the recent samples, not their average.
 
-// Only a move of at least this many points is a sample: the window reports one decimal.
+// A sample needs the window to move a point (it reports one decimal) and the
+// ledger at least this many dollars, so neither rounding nor a quiet spell
+// makes it.
 const MIN_POINTS = 1
-
-const SMOOTHING = 0.3
+const MIN_DOLLARS = 0.25
+const SAMPLES = 8
 
 export const calibrate = (cal: Calibration, usd: number | null, limits: Limits | null): Calibration => {
   const percent = limits?.fiveHour?.percent
   if (usd === null || percent === undefined) return cal
 
   const anchor = cal.anchor
-  // A reset, or the first reading: start counting from here.
+  // A reset, the first reading, or a session leaving the ledger: start again from here.
   if (anchor === null || percent < anchor.percent || usd < anchor.usd) {
     return { ...cal, anchor: { usd, percent } }
   }
 
   const points = percent - anchor.percent
   const dollars = usd - anchor.usd
-  if (points < MIN_POINTS || dollars <= 0) return cal
+  if (points < MIN_POINTS || dollars < MIN_DOLLARS) return cal
 
-  const sample = points / dollars
-  const ratio = cal.percentPerUsd === null ? sample : cal.percentPerUsd * (1 - SMOOTHING) + sample * SMOOTHING
+  const samples = [...cal.samples, points / dollars].slice(-SAMPLES)
 
-  return { anchor: { usd, percent }, percentPerUsd: ratio }
+  return { anchor: { usd, percent }, percentPerUsd: Math.min(...samples), samples }
 }
+
+// One session's line in the shared ledger: what it had spent when it joined,
+// what it has spent now, and when it last wrote.
+export type LedgerEntry = { first: number; usd: number; at: number }
+
+// Entries untouched for this long belong to sessions that have ended.
+export const LEDGER_TTL_MS = 6 * 60 * 60_000
+
+// Spend across the ledger since each session joined it.
+export const totalSpend = (entries: readonly LedgerEntry[], now: number): number =>
+  entries.filter(e => now - e.at < LEDGER_TTL_MS).reduce((sum, e) => sum + Math.max(0, e.usd - e.first), 0)
+
+export const isLedgerEntry = (value: unknown): value is LedgerEntry =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof (value as LedgerEntry).first === 'number' &&
+  typeof (value as LedgerEntry).usd === 'number' &&
+  typeof (value as LedgerEntry).at === 'number'
 
 // What `usd` of list price comes to: "+6%" of the 5-hour window when the
 // ratio is known, dollars where there are no usage windows (an API key),
@@ -84,4 +107,5 @@ export const pointsOf = (usd: number | null, cal: Calibration): number | null =>
 export const formatLanding = (window: LimitWindow, points: number): string =>
   `${formatPercentUsed(window.percent)} → ${formatPercentUsed(Math.min(100, window.percent + points))}`
 
-export const formatPercentUsed = (percent: number): string => `${Math.round(percent)}%`
+// One decimal, as the window reports it, so a small move shows.
+export const formatPercentUsed = (percent: number): string => `${percent.toFixed(1)}%`

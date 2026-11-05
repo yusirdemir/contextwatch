@@ -6,7 +6,7 @@ Only the latest release receives security fixes.
 
 ## What contextwatch accesses
 
-contextwatch reads token counts and model names from Claude Code's own `turn.step` events, the session cost total, usage windows and active model from `$.session`, and tool names from `$.tool.list()`. It reads the prompt box only to count its characters for the token estimate; it does not keep or send that text, does not read past messages, and makes no network requests. The only thing it writes is one number, the learned usage ratio, in its own plugin store. If you find it doing otherwise, treat that as a security issue.
+contextwatch reads token counts and model names from Claude Code's own `turn.step` events, the session cost total, usage windows and active model from `$.session`, and tool names from `$.tool.list()`. It reads the prompt box only to count its characters for the token estimate; it does not keep or send that text, does not read past messages, and makes no network requests. It writes only to its own plugin store: the learned usage samples, and one line per running session (its id, its spend in dollars, and when it last wrote), dropped after six hours. If you find it doing otherwise, treat that as a security issue.
 
 ## Reporting a vulnerability
 

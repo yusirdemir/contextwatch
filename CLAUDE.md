@@ -63,7 +63,7 @@ npx tsc -p .
 
 ## Units
 
-Subscribers see usage as points of the 5-hour window (`formatImpact`), never dollars; dollars appear only where there are no usage windows (an API key). Route every user-facing cost through `formatImpact`. Show a cost only for what is true now (a cold cache, a switch or MCP change about to rewrite it), never a hypothetical "if cold" figure; the next-message figure comes from the context, the cache and the typed draft (`floorCost`), never an average of past questions. Usage windows belong in the pane, not the band.
+Subscribers see usage as points of the 5-hour window (`formatImpact`), never dollars; dollars appear only where there are no usage windows (an API key). Route every user-facing cost through `formatImpact`. The ratio comes from the shared spend ledger (`accountSpend` in `hooks/register.tsx`) and is the lowest recent sample; never learn it from one session's spend alone. Show a cost only for what is true now (a cold cache, a switch or MCP change about to rewrite it), never a hypothetical "if cold" figure; the next-message figure comes from the context, the cache and the typed draft (`floorCost`), never an average of past questions. Usage windows belong in the pane, not the band.
 
 ## Prices
 

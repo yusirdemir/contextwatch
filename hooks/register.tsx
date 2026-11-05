@@ -2,7 +2,7 @@ import type { EngineInterface, Register, Timer } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
 import { answerCommand, registerCommand } from '../src/commands'
-import { calibrate, parseLimits } from '../src/core/usage'
+import { calibrate, isLedgerEntry, LEDGER_TTL_MS, parseLimits, totalSpend } from '../src/core/usage'
 import { guardColdSend, guardModelSwitch, watchAway } from '../src/guards'
 import type { Options } from '../src/options'
 import { readOptions } from '../src/options'
@@ -16,10 +16,13 @@ const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
 const sessionUsd = atom({ plugin: 'contextwatch', key: 'sessionUsd' } as const, null)
 const activeModel = atom({ plugin: 'contextwatch', key: 'activeModel' } as const, null)
 const limits = atom({ plugin: 'contextwatch', key: 'limits' } as const, null)
-const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null })
+const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null, samples: [] })
 
 // The learned ratio outlives the session: the subscription's windows do not change with it.
-const STORE_RATIO = 'percentPerUsd'
+// v2: the first version learned from one session's spend alone and could read
+// many times too high; its value is ignored.
+const STORE_RATIO = 'calibration.v2'
+const LEDGER_PREFIX = 'spend:'
 
 // Minutes are all the UI shows, so a slow tick keeps it calm.
 const TICK_MS = 30_000
@@ -78,10 +81,10 @@ async function refresh($: EngineInterface) {
     await update($, limits, () => windows)
 
     const before = await read($, calibration)
-    const after = calibrate(before, usd, windows)
+    const after = calibrate(before, await accountSpend($, usd), windows)
     await update($, calibration, () => after)
-    if (after.percentPerUsd !== null && after.percentPerUsd !== before.percentPerUsd) {
-      await $.store.set(STORE_RATIO, after.percentPerUsd)
+    if (after.percentPerUsd !== null && after.samples !== before.samples) {
+      await $.store.set(STORE_RATIO, { percentPerUsd: after.percentPerUsd, samples: after.samples })
     }
   } catch {
     // Hosts without a cost ledger or usage windows leave these out.
@@ -95,11 +98,40 @@ async function refresh($: EngineInterface) {
   }
 }
 
+// Writes this session's spend to the shared ledger and returns the spend of
+// every session on it, so the ratio divides the account's window by the
+// account's dollars. Null without a cost figure.
+async function accountSpend($: EngineInterface, usd: number | null): Promise<number | null> {
+  if (usd === null) return null
+
+  const now = await $.clock.now()
+  const key = `${LEDGER_PREFIX}${await $.session.id()}`
+  const mine = await $.store.get(key)
+  const first = isLedgerEntry(mine) ? mine.first : usd
+  if (!isLedgerEntry(mine) || mine.usd !== usd || now - mine.at > LEDGER_TTL_MS / 2) {
+    await $.store.set(key, { first, usd, at: now })
+  }
+
+  const entries = []
+  for (const k of await $.store.keys()) {
+    if (!k.startsWith(LEDGER_PREFIX)) continue
+    const entry = k === key ? { first, usd, at: now } : await $.store.get(k)
+    if (!isLedgerEntry(entry)) continue
+    if (now - entry.at >= LEDGER_TTL_MS) await $.store.delete(k)
+    else entries.push(entry)
+  }
+
+  return totalSpend(entries, now)
+}
+
 async function loadRatio($: EngineInterface) {
   try {
     const stored = await $.store.get(STORE_RATIO)
-    if (typeof stored === 'number' && stored > 0) {
-      await update($, calibration, cal => (cal.percentPerUsd === null ? { ...cal, percentPerUsd: stored } : cal))
+    const samples = (stored as { samples?: unknown } | undefined)?.samples
+    if (Array.isArray(samples) && samples.length > 0 && samples.every(n => typeof n === 'number' && n > 0)) {
+      await update($, calibration, cal =>
+        cal.percentPerUsd === null ? { ...cal, samples, percentPerUsd: Math.min(...samples) } : cal,
+      )
     }
   } catch {
     // Without the store the ratio is learned again in this session.

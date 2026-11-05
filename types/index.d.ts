@@ -29,8 +29,14 @@ export type LimitWindow = { percent: number; resetsAt: number | null }
 export type Limits = { fiveHour: LimitWindow | null; weekly: LimitWindow | null }
 
 // How many points of the 5-hour window a dollar of list price moves, learned
-// from the session's own spend; `anchor` is where the current sample started.
-export type Calibration = { anchor: { usd: number; percent: number } | null; percentPerUsd: number | null }
+// from the spend of every session on the shared ledger; `anchor` is where the
+// current sample started.
+export type Calibration = {
+  anchor: { usd: number; percent: number } | null
+  percentPerUsd: number | null
+  // The recent samples; the ratio is their lowest.
+  samples: number[]
+}
 
 // MCP servers connected or dropped since the last response.
 export type ToolChange = { added: string[]; removed: string[] }

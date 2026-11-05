@@ -8,7 +8,7 @@ import { floorCost, nextBreakdown, stayCost, switchOptions } from '../src/core/f
 import { formatUsd, modelLabel, priceOf, promptCost, responseCost } from '../src/core/pricing'
 import { bucketTokens, estimateTokens } from '../src/core/tokens'
 import { diffServers, formatChange, serversOf } from '../src/core/tools'
-import { calibrate, formatImpact, formatLanding, formatUntil, parseLimits, pointsOf } from '../src/core/usage'
+import { calibrate, formatImpact, formatLanding, formatUntil, parseLimits, pointsOf, totalSpend } from '../src/core/usage'
 import { formatAgo, formatMinutes, inferTtl, remainingMs, warmth } from '../src/core/ttl'
 
 const MIN = 60_000
@@ -181,7 +181,7 @@ test('usage windows and what a dollar moves them', () => {
   expect(limits?.weekly?.resetsAt).toBeNull()
   expect(parseLimits([])).toBeNull()
 
-  let cal = calibrate({ anchor: null, percentPerUsd: null }, 1, limits)
+  let cal = calibrate({ anchor: null, percentPerUsd: null, samples: [] }, 1, limits)
   expect(cal.percentPerUsd).toBeNull()
   // Half a point is too little to measure.
   cal = calibrate(cal, 2, parseLimits([{ kind: 'five_hour', percentUsed: 40.5 }]))
@@ -190,12 +190,12 @@ test('usage windows and what a dollar moves them', () => {
   expect(cal.percentPerUsd).toBe(2)
   // A window reset starts a new sample instead of a negative one.
   cal = calibrate(cal, 4, parseLimits([{ kind: 'five_hour', percentUsed: 1 }]))
-  expect(cal).toEqual({ anchor: { usd: 4, percent: 1 }, percentPerUsd: 2 })
+  expect(cal).toEqual({ anchor: { usd: 4, percent: 1 }, percentPerUsd: 2, samples: [2] })
 
   expect(formatImpact(0.9, limits, cal)).toBe('+1.8%')
   expect(formatImpact(9, limits, cal)).toBe('+18%')
   expect(formatImpact(0.01, limits, cal)).toBe('<0.1%')
-  expect(formatImpact(0.9, limits, { anchor: null, percentPerUsd: null })).toBeNull()
+  expect(formatImpact(0.9, limits, { anchor: null, percentPerUsd: null, samples: [] })).toBeNull()
   expect(formatImpact(0.9, null, cal)).toBe('~$0.90')
 
   expect(formatUntil(80 * MIN, 0)).toBe('1 h 20 min')
@@ -210,11 +210,11 @@ test('the next message costs at least what the context and the cache say', () =>
   expect(near(floorCost(list, 61 * MIN), (100_402 * 4 * 2) / 1e6)).toBe(true)
   expect(floorCost([], MIN)).toBeNull()
 
-  const cal = { anchor: null, percentPerUsd: 5 }
+  const cal = { anchor: null, percentPerUsd: 5, samples: [5] }
   expect(pointsOf(0.4, cal)).toBe(2)
-  expect(pointsOf(0.4, { anchor: null, percentPerUsd: null })).toBeNull()
-  expect(formatLanding({ percent: 41, resetsAt: null }, 2.3)).toBe('41% → 43%')
-  expect(formatLanding({ percent: 99, resetsAt: null }, 5)).toBe('99% → 100%')
+  expect(pointsOf(0.4, { anchor: null, percentPerUsd: null, samples: [] })).toBeNull()
+  expect(formatLanding({ percent: 41, resetsAt: null }, 2.3)).toBe('41.0% → 43.3%')
+  expect(formatLanding({ percent: 99, resetsAt: null }, 5)).toBe('99.0% → 100.0%')
 })
 
 test('typed text is estimated in tokens, erring high', () => {
@@ -247,4 +247,30 @@ test('the next message splits into what is read and what is written', () => {
   const cold = nextBreakdown(list, 61 * MIN)!
   expect(cold.readTokens).toBe(0)
   expect(cold.writeTokens).toBe(100_402)
+})
+
+test('the ratio is the lowest recent sample, and needs real spend', () => {
+  const at = (percent: number) => parseLimits([{ kind: 'five_hour', percentUsed: percent }])
+  let cal = calibrate({ anchor: null, percentPerUsd: null, samples: [] }, 0, at(10))
+  // A point on ten cents is too little spend to trust.
+  cal = calibrate(cal, 0.1, at(11))
+  expect(cal.percentPerUsd).toBeNull()
+  // 2 points on $1.00: 2 per dollar.
+  cal = calibrate(cal, 1, at(12))
+  expect(cal.percentPerUsd).toBe(2)
+  // Spend the ledger cannot see inflates a sample; the lowest stands.
+  cal = calibrate(cal, 1.5, at(17))
+  expect(cal.samples).toEqual([2, 10])
+  expect(cal.percentPerUsd).toBe(2)
+})
+
+test('the ledger adds the spend of every session since it joined', () => {
+  const now = 10 * 60 * MIN
+  const entries = [
+    { first: 5, usd: 7, at: now - MIN },
+    { first: 0, usd: 1.5, at: now - 2 * MIN },
+    // An ended session, untouched for seven hours.
+    { first: 0, usd: 40, at: now - 7 * 60 * MIN },
+  ]
+  expect(totalSpend(entries, now)).toBe(3.5)
 })

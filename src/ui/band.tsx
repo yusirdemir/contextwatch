@@ -19,7 +19,7 @@ const activeModel = atom({ plugin: 'contextwatch', key: 'activeModel' } as const
 const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, null)
 const compactStats = atom({ plugin: 'contextwatch', key: 'compactStats' } as const, null)
 const limits = atom({ plugin: 'contextwatch', key: 'limits' } as const, null)
-const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null })
+const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null, samples: [] })
 const draftTokens = atom({ plugin: 'contextwatch', key: 'draftTokens' } as const, 0)
 
 // `tip` is the quiet suggestion drawn after the line; `canCompact` adds its button.

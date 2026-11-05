@@ -87,7 +87,7 @@ Details: [docs/how-it-works.md](docs/how-it-works.md). Every field it reads: [do
 ## Limitations
 
 - **The countdown is an estimate.** The server can evict a cache entry early. The next response's hit rate shows what actually happened.
-- **Usage impact is learned.** Claude Code reports how full each window is, not how much one message uses. contextwatch learns how many points a dollar of list price moves the 5-hour window from your own spend, so the `+%` figures appear after a few messages and get steadier over time. Other sessions on the same account at the same time push them up.
+- **Usage impact is learned.** Claude Code reports how full each window is, not how much one message uses. contextwatch learns how many points a dollar of list price moves the 5-hour window from the spend of every session running it, so the `+%` figures appear once you have spent about $0.25 and moved the window a point. Use outside those sessions (claude.ai, a session without the mod) can only push a sample up, so contextwatch keeps the lowest recent one.
 - **Figures cover the context only.** Your new message and the answer come on top.
 - **The MCP warning is a heuristic.** It compares MCP servers in the tool list, so a tool loaded on demand from a server that was not loaded before can raise it. The next response's hit rate confirms.
 - **Organization policy plugins can take model switches.** Where an organization seats a policy plugin that decides `PreModelSwitch` itself, the switch confirmation is skipped and Claude Code notes it in the transcript. Set `confirmSwitchUsd` to `0` there; the band still warns after a switch.

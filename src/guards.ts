@@ -15,7 +15,7 @@ const toolBaseline = atom({ plugin: 'contextwatch', key: 'toolBaseline' } as con
 const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, null)
 const compactStats = atom({ plugin: 'contextwatch', key: 'compactStats' } as const, null)
 const limits = atom({ plugin: 'contextwatch', key: 'limits' } as const, null)
-const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null })
+const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null, samples: [] })
 
 // Asks before a model switch that would throw away a warm cache for more
 // than the configured amount. The engine prices the rewrite itself.

@@ -20,7 +20,7 @@ const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, 
 const compactStats = atom({ plugin: 'contextwatch', key: 'compactStats' } as const, null)
 const showModels = atom({ plugin: 'contextwatch', key: 'showModels' } as const, false)
 const limits = atom({ plugin: 'contextwatch', key: 'limits' } as const, null)
-const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null })
+const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null, samples: [] })
 const draftTokens = atom({ plugin: 'contextwatch', key: 'draftTokens' } as const, 0)
 
 export const PANE = 'contextwatch'

@@ -105,7 +105,13 @@ The session total in the pane is Claude Code's own figure (`$.session.usage().co
 
 On a Pro or Max subscription, `$.session.usage().rateLimits` reports the `five_hour` and `seven_day` windows: how full each is (0 to 100, one decimal) and when it resets. It does not say how much one message uses.
 
-contextwatch learns that from the session itself. It keeps an anchor (session cost and 5-hour percentage); once the window has moved at least one point, it takes `points ÷ dollars` as a sample and folds it into a running estimate (30% weight for each new sample). A window reset, or a drop in either figure, starts a new anchor. The estimate is saved in the plugin's store, so a new session starts with it.
+contextwatch learns how many points a dollar of list price moves the 5-hour window. The window is the account's, so the dollars must be too:
+
+- **A shared ledger.** Every session running contextwatch writes its spend to the plugin's store (`spend:<session id>`: what it had spent when it joined, what it has spent now, when it last wrote). The ratio divides the window's move by the ledger's total, so two sessions at once do not make one of them look expensive. Entries untouched for six hours are dropped.
+- **Samples.** An anchor holds the ledger total and the window's percentage; once the window has moved at least one point and the ledger at least $0.25, `points ÷ dollars` is a sample and a new anchor starts. A window reset, or a drop in either figure, starts a new anchor.
+- **The lowest sample.** Spend the ledger cannot see (claude.ai, a session without the mod) only ever pushes a sample up, never down, so the ratio is the lowest of the last eight samples rather than their average.
+
+The samples are saved in the store (`calibration.v2`), so a new session starts with them. The first version learned from one session's spend alone and could read many times too high; its stored value is ignored.
 
 ```text
 impact of a cold cache = cold rewrite (list price) × points per dollar

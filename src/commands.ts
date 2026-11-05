@@ -12,7 +12,7 @@ const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
 const lastCompactAt = atom({ plugin: 'contextwatch', key: 'lastCompactAt' } as const, null)
 const limits = atom({ plugin: 'contextwatch', key: 'limits' } as const, null)
-const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null })
+const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null, samples: [] })
 
 export async function registerCommand($: EngineInterface) {
   await $.command.register({

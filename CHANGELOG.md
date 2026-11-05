@@ -8,6 +8,8 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The usage ratio could read many times too high when another session was using the account at the same time. Sessions now share a spend ledger, the ratio is the lowest recent sample, a sample needs $0.25 of spend, and the old stored value is ignored.
+- Usage percentages show one decimal, so a small move is visible.
 - With `confirmSwitchUsd` set to `0`, the model-switch hook is not registered, so sessions where an organization's policy plugin decides model switches no longer note a skipped hook.
 - The countdown starts when a request starts, not when its answer ends; long answers no longer make it read a few minutes high.
 
