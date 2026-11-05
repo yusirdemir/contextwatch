@@ -60,4 +60,4 @@ npx tsc -p .
 
 ## Design
 
-The UI must stay calm: one dim line in the band, colour only for the state marker (theme keys `success`, `warning`, `inactive`), whole minutes only (no seconds, no fast ticking), no animation, no extra toasts. Anything new goes in the pane, not the band. SVG is drawn only where the surface has `Svg`; every chart needs a text fallback for the terminal.
+The UI must stay calm: the status line is the always-on surface; the band above the prompt appears only for alerts that need a decision before sending (model switch, MCP change); colour only for the state marker (theme keys `success`, `warning`, `inactive`), whole minutes only (no seconds, no fast ticking), no animation, no extra toasts. Anything new goes in the pane, not the band. SVG is drawn only where the surface has `Svg`; every chart needs a text fallback for the terminal.

@@ -9,13 +9,16 @@ Claude Code caches your conversation for a limited time, usually one hour. While
 
 contextwatch shows how much time is left and what the next message costs, so you know before you send.
 
+Under the prompt, in the status line:
+
 ```text
-● Cache 59 min left · cache read ~$0.04 · cold ~$1.50   [Details]
+cache 55 min · read $0.06 · cold $2.55
 ```
 
 ## Features
 
-- **Countdown**: minutes left before the cache lapses, in the status line and above the prompt. It updates every 30 seconds and never shows seconds, so it stays out of the way.
+- **Countdown**: minutes left before the cache lapses, in the status line under the prompt. It updates every 30 seconds and never shows seconds, so it stays out of the way.
+- **Alerts only when needed**: a line above the prompt appears only after a model switch or an MCP change that will rewrite a warm cache.
 - **Cache cost**: what the context costs on the next message, as a cache read while warm and as a cache rewrite once cold.
 - **Model switch preview**: the cache cost of the first message on each other model, and a warning as soon as you switch.
 - **Switch confirmation**: asks before a model switch that would throw away a warm cache for more than $0.50 (configurable).
@@ -45,10 +48,9 @@ Answer `y` to add the marketplace, then choose a scope. The pane opens with your
 
 | Where | What you see |
 | --- | --- |
-| Above the prompt | `● Cache 59 min left · cache read ~$0.04 · cold ~$1.50` and a **Details** button |
-| After a model switch | `● Switched to Sonnet 5.5 · cache rewrite 187k tokens ~$0.75` |
-| After an MCP change | `● MCP servers changed (+github) · likely cache rewrite ~$1.50` |
-| Status line | `cache 59 min · read $0.04` |
+| Status line (always) | `cache 55 min · read $0.06 · cold $2.55` |
+| Above the prompt, after a model switch | `● Switched to Sonnet 5.5 · cache rewrite 187k tokens ~$0.75` and a **Details** button |
+| Above the prompt, after an MCP change | `● MCP servers changed (+github) · likely cache rewrite ~$1.50` |
 | Pane (**Context**) | Countdown, cache cost, switch costs per model, context chart, session cost |
 
 | Command | Does |

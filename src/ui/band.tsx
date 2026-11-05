@@ -1,61 +1,61 @@
 import type { On } from 'claude-code'
 import { atom, read } from 'claude-code'
 
+import type { Snapshot, ToolChange } from '../../types'
 import { stayCost, switchOptions } from '../core/forecast'
 import { contextTokens, formatTokens } from '../core/metrics'
 import { formatUsd, isSameModel, modelLabel } from '../core/pricing'
 import { formatChange } from '../core/tools'
-import { formatMinutes, remainingMs, warmth } from '../core/ttl'
+import { warmth } from '../core/ttl'
 import { openPane } from './pane'
-import { COLOR, DOT } from './theme'
 
 const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
 const activeModel = atom({ plugin: 'contextwatch', key: 'activeModel' } as const, null)
 const toolChange = atom({ plugin: 'contextwatch', key: 'toolChange' } as const, null)
 
-// One quiet line above the prompt.
+// The line above the prompt appears only for what needs a decision before
+// sending: a model switch or an MCP change that will rewrite a warm cache.
+// Everything else lives in the status line and the pane.
 export function registerBand(on: On) {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const list = await read($, history)
-    const last = list.at(-1)
-    if (e.props.hasSurvey || last === undefined) return next(e)
+    if (e.props.hasSurvey) return next(e)
+
+    const words = alertFor(list, await read($, now), await read($, activeModel), await read($, toolChange))
+    if (words === null) return next(e)
 
     const { Box, Button, Text } = $.ui.resolve(e)
-    const time = await read($, now)
-    const model = await read($, activeModel)
-    const change = await read($, toolChange)
-    const state = warmth(last, time)
-    const tokens = formatTokens(contextTokens(last))
-    const words = describe()
 
     return (
       <Box>
-        <Text color={COLOR[state]}>{DOT[state]} </Text>
+        <Text color="warning">● </Text>
         <Text dimColor>{words} </Text>
         <Button key="details" label="Details" onPress={() => openPane($)} />
       </Box>
     )
-
-    function describe(): string {
-      const isSwitched = model !== null && last !== undefined && !isSameModel(model, last.model)
-      if (isSwitched) {
-        const option = switchOptions(list, time).find(o => isSameModel(o.model, model))
-        const cost = option?.cost ?? null
-        const price = cost === null ? '' : ` ~${formatUsd(cost)}`
-
-        return `Switched to ${modelLabel(model)} · cache rewrite ${tokens} tokens${price}`
-      }
-
-      const cost = stayCost(list, time)
-      const rewrite = cost.cold === null ? '' : ` ~${formatUsd(cost.cold)}`
-      if (state === 'cold') return `Cache cold · rewrite ${tokens} tokens${rewrite}`
-      if (change !== null) return `MCP servers changed (${formatChange(change)}) · likely cache rewrite${rewrite}`
-
-      const readPart = cost.warm === null ? '' : ` · cache read ~${formatUsd(cost.warm)}`
-      const cold = cost.cold === null ? '' : ` · cold${rewrite}`
-
-      return `Cache ${formatMinutes(remainingMs(last!, time))} left${readPart}${cold}`
-    }
   })
+}
+
+const alertFor = (list: Snapshot[], time: number, model: string | null, change: ToolChange | null): string | null => {
+  const last = list.at(-1)
+  if (last === undefined || warmth(last, time) === 'cold') return null
+
+  const tokens = formatTokens(contextTokens(last))
+
+  if (model !== null && !isSameModel(model, last.model)) {
+    const cost = switchOptions(list, time).find(o => isSameModel(o.model, model))?.cost ?? null
+    const price = cost === null ? '' : ` ~${formatUsd(cost)}`
+
+    return `Switched to ${modelLabel(model)} · cache rewrite ${tokens} tokens${price}`
+  }
+
+  if (change !== null) {
+    const cost = stayCost(list, time).cold
+    const price = cost === null ? '' : ` ~${formatUsd(cost)}`
+
+    return `MCP servers changed (${formatChange(change)}) · likely cache rewrite${price}`
+  }
+
+  return null
 }

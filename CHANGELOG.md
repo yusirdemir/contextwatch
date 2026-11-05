@@ -8,7 +8,8 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Live cache countdown in the status line and above the prompt, in whole minutes, updated every 30 seconds.
+- Live cache countdown with read and cold costs in the status line, in whole minutes, updated every 30 seconds.
+- A line above the prompt that appears only for a model switch or MCP change that will rewrite a warm cache.
 - Cost of the next message with a warm and a cold cache, from Anthropic list prices.
 - Cost of the first message after switching to each other model, and a warning in the band right after a switch.
 - Per-model cache tracking: a model used earlier in the session that is still warm is priced as a partial hit.

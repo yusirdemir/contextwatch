@@ -15,16 +15,28 @@ const usage: TurnUsage = {
 let servers: string[] = []
 let notices: string[] = []
 
+type EngineOptions = { model?: () => string; onStatus?: (text: string | undefined) => void }
+
 // Stands for the engine: each model request is answered with `usage`.
-const engine = (on: On) => {
+const engine = (on: On, options: EngineOptions = {}) => {
   servers = ['github']
   notices = []
   on('command.register', () => ({ value: { command: 'contextwatch' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.status', () => ({ value: undefined }))
+  on('ui.status', (_, e) => {
+    options.onStatus?.(e.text)
+
+    return { value: undefined }
+  })
   on('ui.toast', () => ({ value: undefined }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1_000_000 }, rateLimits: [], cost: { usd: 1.23 } } }))
-  on('session.model', () => ({ value: 'claude-opus-5-5' }))
+  on('session.model', () => ({ value: options.model?.() ?? 'claude-opus-5-5' }))
+  // What the engine draws where the plugin draws nothing.
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+
+    return <Text>engine</Text>
+  })
   on('tool.list', () => ({ value: servers.map(name => ({ name: `mcp__${name}__run`, description: '', mcp: true })) }))
   on('ui.notify', (_, e) => {
     notices.push(e.text)
@@ -66,9 +78,10 @@ test('a response starts the countdown', async ($, on) => {
   expect(ran.text).toMatch(/cache read ~\$0\.02/)
   expect(ran.text).toMatch(/cache rewrite ~\$0\.9/)
 
+  // Nothing needs a decision, so the line above the prompt stays empty.
   for (const surface of ['terminal', 'desktop'] as const) {
     const band = await $.ui.mount({ plugin: 'contextwatch', surface, component: 'AbovePrompt', props: { hasSurvey: false } as never })
-    expect((await band.find({ type: 'Text', text: /48 min left/ }))?.text).toMatch(/cold ~\$0\.91/)
+    expect(await band.find({ type: 'Text', text: /Cache/ })).toBeUndefined()
     await band.unmount()
   }
 })
@@ -210,4 +223,31 @@ test('an MCP server change while warm is flagged in the band', async ($, on) => 
   const after = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
   expect(await after.find({ type: 'Text', text: /MCP servers changed/ })).toBeUndefined()
   await after.unmount()
+})
+
+test('the status line carries the countdown and both cache costs', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  const lines: (string | undefined)[] = []
+  engine(on, { onStatus: text => lines.push(text) })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await drain($.turn.step(STEP))
+  await clock.advance(5 * MIN)
+
+  expect(lines.at(-1)).toBe('cache 55 min · read $0.02 · cold $0.91')
+})
+
+test('a model switch shows the line above the prompt', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  let model = 'claude-opus-5-5'
+  engine(on, { model: () => model })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await drain($.turn.step(STEP))
+  model = 'claude-sonnet-5-5'
+  await clock.advance(1 * MIN)
+
+  const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
+  expect((await band.find({ type: 'Text', text: /Switched to/ }))?.text).toMatch(/Sonnet 5\.5 · cache rewrite 113k tokens/)
+  await band.unmount()
 })
