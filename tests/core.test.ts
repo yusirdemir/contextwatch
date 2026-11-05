@@ -6,7 +6,6 @@ import { explainLast } from '../src/core/explain'
 import { cacheDropped, contextTokens, formatTokens, hitRate } from '../src/core/metrics'
 import { floorCost, nextBreakdown, stayCost, switchOptions } from '../src/core/forecast'
 import { formatUsd, modelLabel, priceOf, promptCost, responseCost } from '../src/core/pricing'
-import { bucketTokens, estimateTokens } from '../src/core/tokens'
 import { diffServers, formatChange, serversOf } from '../src/core/tools'
 import { calibrate, formatImpact, formatLanding, formatUntil, parseLimits, pointsOf, totalSpend } from '../src/core/usage'
 import { formatAgo, formatMinutes, inferTtl, remainingMs, warmth } from '../src/core/ttl'
@@ -195,7 +194,8 @@ test('usage windows and what a dollar moves them', () => {
   expect(formatImpact(0.9, limits, cal)).toBe('+1.8%')
   expect(formatImpact(9, limits, cal)).toBe('+18%')
   expect(formatImpact(0.01, limits, cal)).toBe('<0.1%')
-  expect(formatImpact(0.9, limits, { anchor: null, percentPerUsd: null, samples: [] })).toBeNull()
+  // Before the ratio is learned, the prior stands in and the figure says so.
+  expect(formatImpact(0.9, limits, { anchor: null, percentPerUsd: null, samples: [] })).toBe('~+2.7%')
   expect(formatImpact(0.9, null, cal)).toBe('~$0.90')
 
   expect(formatUntil(80 * MIN, 0)).toBe('1 h 20 min')
@@ -212,37 +212,20 @@ test('the next message costs at least what the context and the cache say', () =>
 
   const cal = { anchor: null, percentPerUsd: 5, samples: [5] }
   expect(pointsOf(0.4, cal)).toBe(2)
-  expect(pointsOf(0.4, { anchor: null, percentPerUsd: null, samples: [] })).toBeNull()
-  expect(formatLanding({ percent: 41, resetsAt: null }, 2.3)).toBe('41.0% → 43.3%')
-  expect(formatLanding({ percent: 99, resetsAt: null }, 5)).toBe('99.0% → 100.0%')
-})
-
-test('typed text is estimated in tokens, erring high', () => {
-  expect(estimateTokens('')).toBe(0)
-  expect(estimateTokens('   ')).toBe(0)
-  // ASCII about 3.5 characters a token.
-  expect(estimateTokens('x'.repeat(350))).toBe(100)
-  // Turkish letters cost more: "kanka şöyle" is 9 ASCII and 2 others.
-  expect(estimateTokens('kanka şöyle')).toBe(Math.ceil(9 / 3.5 + 2 / 1.5))
-  expect(bucketTokens(0)).toBe(0)
-  expect(bucketTokens(1)).toBe(20)
-  expect(bucketTokens(41)).toBe(60)
-})
-
-test('the typed message is written on top of the floor', () => {
-  const list = [snap({ at: 0 })]
-  expect(near(floorCost(list, MIN, 1_000), (100_302 * 0.2 + (100 + 1_000) * 4 * 2) / 1e6)).toBe(true)
-  expect(near(floorCost(list, 61 * MIN, 1_000), (101_402 * 4 * 2) / 1e6)).toBe(true)
+  expect(near(pointsOf(0.4, { anchor: null, percentPerUsd: null, samples: [] }), 1.2)).toBe(true)
+  expect(pointsOf(null, cal)).toBeNull()
+  expect(formatLanding({ percent: 41, resetsAt: null }, 2.3)).toBe('41% → 43.3%')
+  expect(formatLanding({ percent: 99, resetsAt: null }, 5)).toBe('99% → 100%')
 })
 
 test('the next message splits into what is read and what is written', () => {
   const list = [snap({ at: 0 })]
-  const warm = nextBreakdown(list, MIN, 40)!
+  const warm = nextBreakdown(list, MIN)!
   expect(warm.readTokens).toBe(100_302)
-  expect(warm.writeTokens).toBe(140)
+  expect(warm.writeTokens).toBe(100)
   expect(near(warm.readUsd, 100_302 * 0.2 / 1e6)).toBe(true)
-  expect(near(warm.writeUsd, 140 * 4 * 2 / 1e6)).toBe(true)
-  expect(near(warm.total, floorCost(list, MIN, 40)!)).toBe(true)
+  expect(near(warm.writeUsd, 100 * 4 * 2 / 1e6)).toBe(true)
+  expect(near(warm.total, floorCost(list, MIN)!)).toBe(true)
 
   const cold = nextBreakdown(list, 61 * MIN)!
   expect(cold.readTokens).toBe(0)

@@ -65,23 +65,22 @@ export const switchOptions = (list: readonly Snapshot[], now: number): Option[] 
   })
 }
 
-// The least the next message can cost, from the context and the cache
-// alone: the last prompt is read from the cache, and the last answer, which
-// joined the context after it was cached, is written, as is the message being
-// typed (`draftTokens`). Cold, all of it is written. Tool calls and the
-// answer come on top.
-export const floorCost = (list: readonly Snapshot[], now: number, draftTokens = 0): number | null =>
-  nextBreakdown(list, now, draftTokens)?.total ?? null
+// What the next message costs, from the last response's own usage figures
+// and the cache state, with no estimate: the last prompt is read from the
+// cache, and the last answer, which joined the context after it was cached,
+// is written. Cold, all of it is written. The new message itself (tens of
+// tokens beside a context of thousands) and the answer come on top.
+export const floorCost = (list: readonly Snapshot[], now: number): number | null => nextBreakdown(list, now)?.total ?? null
 
 // The next message in two parts: what is read from the cache and what is
 // written to it, in tokens and dollars. The pane draws the dollars as a bar.
 export type Breakdown = { readTokens: number; writeTokens: number; readUsd: number; writeUsd: number; total: number }
 
-export const nextBreakdown = (list: readonly Snapshot[], now: number, draftTokens = 0): Breakdown | null => {
+export const nextBreakdown = (list: readonly Snapshot[], now: number): Breakdown | null => {
   const last = list.at(-1)
   if (last === undefined) return null
 
-  const context = contextTokens(last) + draftTokens
+  const context = contextTokens(last)
   const readTokens = remainingMs(last, now) > 0 ? contextTokens(last) - last.outputTokens : 0
   const writeTokens = context - readTokens
   const readUsd = promptCost(last.model, readTokens, readTokens, last.ttl)

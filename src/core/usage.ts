@@ -71,16 +71,24 @@ export const isLedgerEntry = (value: unknown): value is LedgerEntry =>
   typeof (value as LedgerEntry).usd === 'number' &&
   typeof (value as LedgerEntry).at === 'number'
 
-// What `usd` of list price comes to: "+6%" of the 5-hour window when the
-// ratio is known, dollars where there are no usage windows (an API key),
-// and null while the ratio is still being learned.
+// Until the account's own ratio is learned, this stands in: points of the
+// 5-hour window per dollar of list price, as measured on a Team seat. Figures
+// built on it carry a "~" so they read as the estimate they are.
+export const PRIOR_PERCENT_PER_USD = 3
+
+export const ratioOf = (cal: Calibration): { ratio: number; isAssumed: boolean } =>
+  cal.percentPerUsd === null ? { ratio: PRIOR_PERCENT_PER_USD, isAssumed: true } : { ratio: cal.percentPerUsd, isAssumed: false }
+
+// What `usd` of list price comes to: "+6%" of the 5-hour window ("~+6%" while
+// the ratio is assumed), or dollars where there are no usage windows (an API key).
 export const formatImpact = (usd: number | null, limits: Limits | null, cal: Calibration): string | null => {
   if (usd === null) return null
   if (limits?.fiveHour == null) return `~${formatUsd(usd)}`
-  if (cal.percentPerUsd === null) return null
 
-  const points = usd * cal.percentPerUsd
+  const { ratio, isAssumed } = ratioOf(cal)
+  const points = usd * ratio
   if (points < 0.1) return '<0.1%'
+  if (isAssumed) return `~+${points < 10 ? points.toFixed(1) : Math.round(points)}%`
 
   return `+${points < 10 ? points.toFixed(1) : Math.round(points)}%`
 }
@@ -99,13 +107,15 @@ export const formatUntil = (at: number | null, now: number): string | null => {
   return `${Math.floor(hours / 24)} d ${hours % 24} h`
 }
 
-// The points of the 5-hour window `usd` moves; null while the ratio is unknown.
-export const pointsOf = (usd: number | null, cal: Calibration): number | null =>
-  usd === null || cal.percentPerUsd === null ? null : usd * cal.percentPerUsd
+// The points of the 5-hour window `usd` moves, by the learned or assumed ratio.
+export const pointsOf = (usd: number | null, cal: Calibration): number | null => (usd === null ? null : usd * ratioOf(cal).ratio)
 
 // "41% → 43%": where the 5-hour window lands after `points` more.
 export const formatLanding = (window: LimitWindow, points: number): string =>
   `${formatPercentUsed(window.percent)} → ${formatPercentUsed(Math.min(100, window.percent + points))}`
 
-// One decimal, as the window reports it, so a small move shows.
-export const formatPercentUsed = (percent: number): string => `${percent.toFixed(1)}%`
+// As precise as the engine reports it: "55%" for a whole number, "54.6%" for
+// a decimal, so the figure never claims a precision it was not given.
+const one = (percent: number): string => (Number.isInteger(percent) ? `${percent}%` : `${percent.toFixed(1)}%`)
+
+export const formatPercentUsed = (percent: number): string => one(Math.round(percent * 10) / 10)

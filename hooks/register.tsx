@@ -1,4 +1,4 @@
-import type { EngineInterface, Register, Timer } from 'claude-code'
+import type { EngineInterface, Register, SessionRateLimit, Timer } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
 import { answerCommand, registerCommand } from '../src/commands'
@@ -7,7 +7,6 @@ import { guardColdSend, guardModelSwitch, watchAway } from '../src/guards'
 import type { Options } from '../src/options'
 import { readOptions } from '../src/options'
 import { watchCompactions } from '../src/sources/compact'
-import { watchDraft } from '../src/sources/draft'
 import { watchLive } from '../src/sources/live'
 import { registerBand } from '../src/ui/band'
 import { openPane, registerPane } from '../src/ui/pane'
@@ -46,6 +45,15 @@ export const register: Register = (on, raw) => {
     return started
   })
 
+  // Pushed by the engine after each turn and whenever a usage window moves a
+  // point: the pane follows at once instead of waiting for the next tick.
+  on('session.measure', async ($, e, next) => {
+    const measured = await next(e)
+    await applyUsage($, e)
+
+    return measured
+  })
+
   on('turn.complete', async ($, e, next) => {
     const done = await next(e)
     await tick($, options)
@@ -56,7 +64,6 @@ export const register: Register = (on, raw) => {
   answerCommand(on)
   watchLive(on)
   watchCompactions(on)
-  watchDraft(on)
   guardModelSwitch(on, options)
   guardColdSend(on, options)
   registerBand(on)
@@ -74,7 +81,23 @@ async function tick($: EngineInterface, options: Options) {
 
 async function refresh($: EngineInterface) {
   try {
-    const usage = await $.session.usage()
+    await applyUsage($, await $.session.usage())
+  } catch {
+    // Hosts without a cost ledger or usage windows leave these out.
+  }
+
+  try {
+    const model = await $.session.model()
+    await update($, activeModel, () => model)
+  } catch {
+    // Without it the band cannot warn about a switch; nothing else depends on it.
+  }
+}
+
+// The session total, the usage windows and the learned ratio, from one
+// reading of the engine's figures (polled by the tick, pushed by session.measure).
+async function applyUsage($: EngineInterface, usage: { rateLimits: readonly SessionRateLimit[]; cost?: { usd: number } }) {
+  try {
     const usd = usage.cost?.usd ?? null
     const windows = parseLimits(usage.rateLimits)
     await update($, sessionUsd, () => usd)
@@ -87,14 +110,7 @@ async function refresh($: EngineInterface) {
       await $.store.set(STORE_RATIO, { percentPerUsd: after.percentPerUsd, samples: after.samples })
     }
   } catch {
-    // Hosts without a cost ledger or usage windows leave these out.
-  }
-
-  try {
-    const model = await $.session.model()
-    await update($, activeModel, () => model)
-  } catch {
-    // Without it the band cannot warn about a switch; nothing else depends on it.
+    // Without the store the ratio is not learned; the figures still show.
   }
 }
 

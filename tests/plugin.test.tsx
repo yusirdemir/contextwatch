@@ -143,11 +143,11 @@ test('a response starts the countdown', async ($, on) => {
 
   const ran = await $.command.run({ ...COMMAND, args: '' })
   expect(ran.text).toMatch(/48 min left/)
-  expect(ran.text).toMatch(/5-hour 40\.0% \(resets in 1 h 8 min\)/)
+  expect(ran.text).toMatch(/5-hour 40% \(resets in 1 h 8 min\)/)
 
   for (const surface of ['terminal', 'desktop'] as const) {
     const band = await $.ui.mount({ plugin: 'contextwatch', surface, component: 'AbovePrompt', props: { hasSurvey: false } as never })
-    expect((await band.find({ type: 'Text', text: /^Cache/ }))?.text).toBe('Cache warm · 48 min ')
+    expect((await band.find({ type: 'Text', text: /^Cache/ }))?.text).toBe('Cache warm · 48 min · next message <0.1% ')
     expect(await band.find({ type: 'Button', key: 'details' })).toBeDefined()
     await band.unmount()
   }
@@ -201,7 +201,7 @@ test('the pane shows the countdown, the usage windows and the models on request'
     })
     expect((await pane.find({ type: 'Text', text: /^55 min$/ }))?.text).toBe('55 min')
     expect(await pane.find({ type: 'Text', text: /^5-hour$/ })).toBeDefined()
-    expect((await pane.find({ type: 'Text', text: /^40\.0%$/ }))?.text).toBe('40.0%')
+    expect((await pane.find({ type: 'Text', text: /^40%$/ }))?.text).toBe('40%')
     // Warm: no figure for a cold cache that has not happened.
     expect(await pane.find({ type: 'Text', text: /rewrites the cache/ })).toBeUndefined()
 
@@ -236,7 +236,7 @@ test('a costly switch away from a warm cache asks first', async ($, on) => {
 
   const asked = await $.classic.PreModelSwitch({ ...SWITCH, estimated_cache_write_usd: 0.9 })
   expect(asked.permissionDecision).toBe('ask')
-  expect(asked.permissionDecisionReason).toMatch(/Sonnet 5\.5 rewrites 113k tokens of context \(~\$0\.90\)/)
+  expect(asked.permissionDecisionReason).toMatch(/Sonnet 5\.5 rewrites 113k tokens of context \(~\+2\.7%\)/)
 
   // Under the threshold, or with a cold cache, the switch goes ahead.
   expect((await $.classic.PreModelSwitch(SWITCH)).permissionDecision).toBeUndefined()
@@ -400,7 +400,7 @@ test('the usage a cold cache would add is learned from the spend', async ($, on)
     props: { title: 'Context', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} },
   })
   expect((await pane.find({ type: 'Text', text: /^<0\.1%$/ }))?.text).toBe('<0.1%')
-  expect(await pane.find({ type: 'Text', text: /^44\.0% → 44\.0%$/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /^44% → 44%$/ })).toBeDefined()
   expect((await pane.find({ type: 'Text', text: /read from cache$/ }))?.text).toMatch(/113k read from cache$/)
   expect((await pane.find({ type: 'Text', text: /written/ }))?.text).toMatch(/100 written · last answer$/)
   await pane.unmount()

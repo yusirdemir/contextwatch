@@ -21,7 +21,6 @@ const compactStats = atom({ plugin: 'contextwatch', key: 'compactStats' } as con
 const showModels = atom({ plugin: 'contextwatch', key: 'showModels' } as const, false)
 const limits = atom({ plugin: 'contextwatch', key: 'limits' } as const, null)
 const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const, { anchor: null, percentPerUsd: null, samples: [] })
-const draftTokens = atom({ plugin: 'contextwatch', key: 'draftTokens' } as const, 0)
 
 export const PANE = 'contextwatch'
 
@@ -56,7 +55,6 @@ export function registerPane(on: On) {
     const isOpen = await read($, showModels)
     const windows: Limits | null = await read($, limits)
     const cal = await read($, calibration)
-    const draft = await read($, draftTokens)
 
     const state = warmth(last, time)
     const left = remainingMs(last, time)
@@ -109,7 +107,7 @@ export function registerPane(on: On) {
 
     // The next message as a card: the figure, where the 5-hour window lands,
     // and a bar of what it is made of (read from the cache, or written to it).
-    const parts = nextBreakdown(list, time, draft)
+    const parts = nextBreakdown(list, time)
     const next = formatImpact(parts?.total ?? null, windows, cal)
     const points = pointsOf(parts?.total ?? null, cal)
     const landing = windows?.fiveHour == null || points === null ? null : formatLanding(windows.fiveHour, points)
@@ -123,7 +121,6 @@ export function registerPane(on: On) {
         { fraction: parts.writeUsd / whole, color: INK.cooling },
       ]
       const share = (usd: number) => `${Math.round((usd / whole) * 100)}%`
-      const written = draft > 0 ? 'last answer + your message' : 'last answer'
 
       return (
         <Box flexDirection="column" gap={1}>
@@ -154,14 +151,14 @@ export function registerPane(on: On) {
             <Text>
               <Text color="warning">● </Text>
               <Text dimColor>
-                {formatTokens(parts.writeTokens)} written{state === 'cold' ? ', the whole context' : ` · ${written}`}
+                {formatTokens(parts.writeTokens)} written{state === 'cold' ? ', the whole context' : ' · last answer'}
               </Text>
             </Text>
             <Text dimColor>{share(parts.writeUsd)}</Text>
           </Box>
-          {next === null && (
+          {cal.percentPerUsd === null && windows !== null && (
             <Text dimColor size="caption">
-              Learning how much a message moves your 5-hour window.
+              ~ estimated until this account's rate is learned (about a point of use).
             </Text>
           )}
         </Box>

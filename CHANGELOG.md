@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The pane follows usage at once (`session.measure`) instead of on the next 30-second tick, and shows percentages as precise as Claude Code reports them.
 - The usage ratio could read many times too high when another session was using the account at the same time. Sessions now share a spend ledger, the ratio is the lowest recent sample, a sample needs $0.25 of spend, and the old stored value is ignored.
 - Usage percentages show one decimal, so a small move is visible.
 - With `confirmSwitchUsd` set to `0`, the model-switch hook is not registered, so sessions where an organization's policy plugin decides model switches no longer note a skipped hook.
@@ -22,7 +23,7 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 - Cost of the first message after switching to each other model, and a warning in the band right after a switch.
 - Per-model cache tracking: a model used earlier in the session that is still warm is priced as a partial hit.
 - Question before sending into a large cold cache: send anyway, compact then send, or start fresh then send (`askWhenCold`).
-- Next message in the band (`next message +0.7%`): worked out from the context, the cache and the message being typed (estimated tokens), not an average of past questions. The pane shows where the 5-hour window lands (`41% → 42%`) as a faint segment on the bar.
+- Next message in the band (`next message +0.7%`), from the first message: worked out from the last response's usage and the cache state, with no estimate and no network call; `~` until the account's rate is learned. The pane shows where the 5-hour window lands as a faint segment on the bar.
 - The status line is gone; the band above the prompt carries the countdown.
 - Band shows the cache state only; a cost appears once the cache is cold or a switch will rewrite it. Usage windows live in the pane.
 - The pane's next-message card: the figure, where the 5-hour window lands, and a colour bar of what is read from the cache and what is written.

@@ -16,7 +16,7 @@ contextwatch shows how much time is left, and when the cache has gone cold it sa
 ## Features
 
 - **Countdown**: minutes left before the cache lapses, above the prompt. It updates every 30 seconds and never shows seconds, so it stays out of the way. Costs appear only when they apply: once the cache is cold, or a switch is about to rewrite it.
-- **Next message**: what your next message will add to the 5-hour window, worked out from the context, the cache and what you are typing: the last prompt read from the cache, the last answer and your draft written, or everything written once cold. It updates as you type. The pane shows where the window lands (`41% → 42%`) as a faint segment on the bar. It grows as the context grows; compacting resets it.
+- **Next message**: what your next message will add to the 5-hour window, worked out from the last response's own usage figures and the cache state, with no estimate and no network call: the last prompt read from the cache and the last answer written, or everything written once cold. The pane shows where the window lands (`41% → 42%`) as a faint segment on the bar. It grows as the context grows; compacting resets it. Until your account's rate is learned, the figure carries a `~`.
 - **Cold-send question**: send a message into a large cold cache and contextwatch asks first: send anyway, compact then send, or start fresh then send.
 - **Compact before you leave**: in the last ten minutes, a quiet grey tip compares compacting now with coming back to a cold cache, with a **Compact** button. A compaction reads the whole context, which is cheap only while it is still cached.
 - **Alerts in place**: after a model switch or an MCP change that will rewrite a warm cache, the line above the prompt turns amber and says so.
@@ -97,7 +97,7 @@ Details: [docs/how-it-works.md](docs/how-it-works.md). Every field it reads: [do
 
 ## Privacy
 
-contextwatch reads token counts, model names, tool names, the session cost total and the usage windows. It stores one number, the learned usage ratio, in its own settings file. It does not read your messages, write files, or make network requests. See [SECURITY.md](SECURITY.md).
+contextwatch reads token counts, model names, tool names, the session cost total and the usage windows. It stores the learned usage samples and a per-session spend line in its own plugin store. It does not read your messages, write files, or make network requests. See [SECURITY.md](SECURITY.md).
 
 ## Contributing
 

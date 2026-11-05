@@ -55,16 +55,18 @@ A miss right after a model change says nothing about the TTL and is ignored.
 
 ## Next message
 
-Worked out from the context, the cache and the prompt box, not from past questions:
+Worked out from the last response's own usage figures and the cache state, with no estimate and no network call:
 
 ```text
-warm   = (context − last answer) × cacheRead  +  (last answer + draft) × input × write multiplier
-cold   = (context + draft) × input × write multiplier
+warm   = (context − last answer) × cacheRead  +  last answer × input × write multiplier
+cold   = context × input × write multiplier
 ```
 
-While warm, the last prompt is still cached and is read; the last answer joined the context after it was cached, so it is written, as is the message being typed. Once cold, everything is written. Tool calls and the answer add a little more on top.
+While warm, the last prompt is still cached and is read; the last answer joined the context after it was cached, so it is written. Once cold, everything is written. The token counts are the API's own (`usage`), not counted locally.
 
-**The draft.** `prompt.edit` and `prompt.change` report the prompt box after every edit. Claude Code exposes no tokenizer to a mod, so the draft is estimated from its characters: about 3.5 ASCII characters a token, 1.5 for other scripts (Turkish letters, accents, emoji), erring high. The estimate is rounded up in steps of 20 tokens so typing does not redraw the band on every key.
+The new message itself is left out: Claude's tokenizer is not available locally, and counting it exactly would mean sending the draft to Anthropic before you press Enter. Beside a context of thousands of tokens, a message of a few dozen changes the figure by well under a hundredth of a point. Tool calls and the answer also come on top.
+
+**From the first message.** Turning dollars into points of the 5-hour window needs the account's ratio (see Usage limits). Until it is learned, contextwatch uses 3 points per dollar, as measured on a Team seat, and marks the figure with `~`.
 
 The band shows the figure as points of the 5-hour window. The pane shows it as a card: the figure, where the window lands (`41% → 42%`), and a bar split by cost into what is read from the cache (green) and what is written (amber), with the tokens and share of each. The same figure is drawn as a faint segment on the 5-hour usage bar. It grows as the conversation grows and drops after a compaction.
 
