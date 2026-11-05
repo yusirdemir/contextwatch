@@ -19,9 +19,15 @@ const calibration = atom({ plugin: 'contextwatch', key: 'calibration' } as const
 
 // Asks before a model switch that would throw away a warm cache for more
 // than the configured amount. The engine prices the rewrite itself.
+//
+// Not registered at all when turned off (0): where an organization's policy
+// plugin decides model switches itself, the hook would only ever be skipped,
+// and the session would say so on every switch.
 export function guardModelSwitch(on: On, options: Options) {
+  if (options.confirmSwitchUsd <= 0) return
+
   on('classic.PreModelSwitch', async ($, e, next) => {
-    const isCostly = options.confirmSwitchUsd > 0 && e.prompt_cache_warm && e.estimated_cache_write_usd >= options.confirmSwitchUsd
+    const isCostly = e.prompt_cache_warm && e.estimated_cache_write_usd >= options.confirmSwitchUsd
     if (!isCostly) return next(e)
 
     const last = (await read($, history)).at(-1)

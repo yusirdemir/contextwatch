@@ -70,7 +70,7 @@ Change these in the config menu, or under `pluginConfigs.contextwatch` in `~/.cl
 | Setting | Default | Does |
 | --- | --- | --- |
 | `askWhenCold` | `true` | Before a message goes into a cold cache of 60k tokens or more, ask whether to send anyway, compact first, or start fresh. |
-| `confirmSwitchUsd` | `0.5` | Ask before a model switch that would rewrite a warm cache for more than this many dollars. `0` turns it off. |
+| `confirmSwitchUsd` | `0.5` | Ask before a model switch that would rewrite a warm cache for more than this many dollars. `0` turns it off and registers no hook. |
 | `awayReminder` | `false` | Send one notice shortly before the cache lapses. |
 | `awayReminderMinutes` | `5` | How many minutes before the cache lapses the notice is sent. |
 
@@ -90,6 +90,7 @@ Details: [docs/how-it-works.md](docs/how-it-works.md). Every field it reads: [do
 - **Usage impact is learned.** Claude Code reports how full each window is, not how much one message uses. contextwatch learns how many points a dollar of list price moves the 5-hour window from your own spend, so the `+%` figures appear after a few messages and get steadier over time. Other sessions on the same account at the same time push them up.
 - **Figures cover the context only.** Your new message and the answer come on top.
 - **The MCP warning is a heuristic.** It compares MCP servers in the tool list, so a tool loaded on demand from a server that was not loaded before can raise it. The next response's hit rate confirms.
+- **Organization policy plugins can take model switches.** Where an organization seats a policy plugin that decides `PreModelSwitch` itself, the switch confirmation is skipped and Claude Code notes it in the transcript. Set `confirmSwitchUsd` to `0` there; the band still warns after a switch.
 - **Unknown models** show no cost. Prices live in `src/core/pricing.ts`.
 - **History is per session.** A new or cleared session starts empty.
 - **The TTL starts as an assumption** (one hour) until a response confirms it.

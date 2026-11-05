@@ -44,6 +44,7 @@ The validator enforces these; breaking one fails `claude plugin validate`.
 - `$.command.run` (and a compaction) cannot run inside `prompt.submit`: it would wait on the turn the hook holds. Drop the prompt, run the action from `$.clock.after(0, …)`, then `$.prompt.submit({ text, asUser: true })`.
 - The test kit cannot raise `prompt.edit` or `prompt.change`; test the draft through `estimateTokens` and `floorCost` instead.
 - `$.ui.ask` is the `AskUserQuestion` tool: in tests answer it with `on('tool.call', { tool: 'AskUserQuestion' }, …)`, and `{ deny }` for a dismissal.
+- An organization's policy plugin can send an event past personal plugins (`next.to`), and the engine notes the skipped hook. Register a guard only when its option is on, so it can be silenced.
 - New settings go in `userConfig` in `plugin.json` and are parsed in `src/options.ts`; document them in the README's Settings table.
 - In tests, a `session.compact` call needs at least one message; argless `$.session.compact()` from the plugin cannot run there, so test the button's presence, not the press.
 - In tests, read a `turn.step` stream to its end before asserting; the engine stand-ins must answer `ui.status` and `ui.toast` with `{ value: undefined }`.

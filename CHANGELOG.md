@@ -8,6 +8,7 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- With `confirmSwitchUsd` set to `0`, the model-switch hook is not registered, so sessions where an organization's policy plugin decides model switches no longer note a skipped hook.
 - The countdown starts when a request starts, not when its answer ends; long answers no longer make it read a few minutes high.
 
 ### Added
