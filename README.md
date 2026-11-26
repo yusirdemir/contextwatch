@@ -10,23 +10,22 @@ Claude Code caches your conversation for a limited time, usually one hour. While
 contextwatch shows how much time is left, and when the cache has gone cold it says what the next message will cost, so you know before you send.
 
 ```text
-● Cache warm · 55 min · next message +0.7%   [Details]
+● Cache warm · 55 min · next message +0.7%
 ```
 
 ## Features
 
 - **Countdown**: minutes left before the cache lapses, above the prompt. It updates every 30 seconds and never shows seconds, so it stays out of the way. Costs appear only when they apply: once the cache is cold, or a switch is about to rewrite it.
-- **Next message**: what your next message will add to the 5-hour window, worked out from the last response's own usage figures and the cache state, with no estimate and no network call: the last prompt read from the cache and the last answer written, or everything written once cold. The pane shows where the window lands (`41% → 42%`) as a faint segment on the bar. It grows as the context grows; compacting resets it. Until your account's rate is learned, the figure carries a `~`.
+- **Next message**: what your next message will add to the 5-hour window, worked out from the last response's own usage figures and the cache state, with no estimate and no network call: the last prompt read from the cache and the last answer written, or everything written once cold. It grows as the context grows; compacting resets it. Until your account's rate is learned, the figure carries a `~`.
 - **Cold-send question**: send a message into a large cold cache and contextwatch asks first: send anyway, compact then send, or start fresh then send.
 - **Compact before you leave**: in the last ten minutes, a quiet grey tip compares compacting now with coming back to a cold cache, with a **Compact** button. A compaction reads the whole context, which is cheap only while it is still cached.
-- **Alerts in place**: after a model switch or an MCP change that will rewrite a warm cache, the line above the prompt turns amber and says so.
-- **Usage limits** (in the pane): the 5-hour and weekly windows of a Pro or Max subscription, with when each resets. The 5-hour bar shows what the next message adds as a faint segment, with where it lands (`41% → 43%`). With an API key, dollars instead.
-- **Model switch preview**: what the first message on each other model would add, and a warning as soon as you switch.
+- **Alerts in place**: after a model switch or an MCP change that will rewrite a warm cache, the line above the prompt turns amber and says so for half a minute, then the usual line comes back with the rewrite as its next-message figure.
+- **Usage limits** (in `/contextwatch`): the 5-hour and weekly windows of a Pro or Max subscription, with when each resets. With an API key, dollars instead.
+- **Model switch warning**: as soon as you switch, what the first message on the new model will add.
 - **Switch confirmation**: asks before a model switch that would throw away a warm cache for more than $0.50 (configurable).
 - **MCP change warning**: flags a connected or dropped MCP server while the cache is warm, since the tool list is part of the cached prompt.
 - **Away reminder** (off by default): one notice a few minutes before the cache lapses.
 - **Calm colour**: green while warm, amber in the last ten minutes of an hour, grey once cold.
-- **Detail pane**: the minutes left as one large figure; a next-message card with the figure, where the 5-hour window lands and a colour bar of what is read from the cache (green) and what is written (amber); the usage windows; at most one suggestion; the other models on request; and a one-line session summary.
 - **Miss alerts**: a short notice when a response had to write the cache again.
 - **`/contextwatch why`**: explains the last miss — the TTL lapsed, the model changed, or the prompt prefix changed.
 - **TTL detection**: learns whether your cache lives one hour or five minutes from your own responses.
@@ -43,22 +42,21 @@ At the prompt of a Claude Code session:
 /plugin install contextwatch --marketplace yusirdemir/contextwatch
 ```
 
-Answer `y` to add the marketplace, then choose a scope. The pane opens with your next session.
+Answer `y` to add the marketplace, then choose a scope. The line above the prompt appears after the first response of your next session.
 
 ## Usage
 
 | Where | What you see |
 | --- | --- |
-| Above the prompt | `● Cache warm · 55 min · next message +0.7%` and a **Details** button that opens the pane |
+| Above the prompt | `● Cache warm · 55 min · next message +0.7%` |
 | Above the prompt, cooling | `● Cache cooling · 8 min · Leaving? Compact first` and a **Compact** button |
 | Above the prompt, cold | `○ Cache cold · next message rewrites 187k (+6%)` |
-| Above the prompt, after a model switch | `● Switched to Sonnet 5.5 · cache rewrite +3%` |
-| Above the prompt, after an MCP change | `● MCP changed (+github) · likely cache rewrite +6%` |
-| Pane (**Context**) | Minutes left, next-message card with a read/write colour bar, 5-hour and weekly usage with reset times, one suggestion, other models on request, session summary |
+| Above the prompt, after a model switch | `● Switched to Sonnet 5.5 · cache rewrite +3%` for half a minute |
+| Above the prompt, after an MCP change | `● MCP changed (+github) · likely cache rewrite +6%` for half a minute |
 
 | Command | Does |
 | --- | --- |
-| `/contextwatch` | Opens the pane and prints the current figures |
+| `/contextwatch` | Prints the current figures, with the usage windows |
 | `/contextwatch why` | Explains why the last response missed the cache |
 
 The countdown starts after the first response of a session.

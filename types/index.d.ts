@@ -41,6 +41,10 @@ export type Calibration = {
 // MCP servers connected or dropped since the last response.
 export type ToolChange = { added: string[]; removed: string[] }
 
+// The change the band flags (a model switch or an MCP change, by key) and
+// when it was first seen; the band shows it for a moment from then.
+export type Alert = { key: string; at: number }
+
 declare module 'claude-code' {
   interface PluginState {
     contextwatch: {
@@ -59,8 +63,7 @@ declare module 'claude-code' {
       // The subscription's usage windows; null with an API key.
       limits: Limits | null
       calibration: Calibration
-      // Whether the pane's model comparison is open.
-      showModels: boolean
+      alert: Alert | null
     }
   }
 }

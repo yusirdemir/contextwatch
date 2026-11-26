@@ -107,13 +107,6 @@ export const formatUntil = (at: number | null, now: number): string | null => {
   return `${Math.floor(hours / 24)} d ${hours % 24} h`
 }
 
-// The points of the 5-hour window `usd` moves, by the learned or assumed ratio.
-export const pointsOf = (usd: number | null, cal: Calibration): number | null => (usd === null ? null : usd * ratioOf(cal).ratio)
-
-// "41% → 43%": where the 5-hour window lands after `points` more.
-export const formatLanding = (window: LimitWindow, points: number): string =>
-  `${formatPercentUsed(window.percent)} → ${formatPercentUsed(Math.min(100, window.percent + points))}`
-
 // As precise as the engine reports it: "55%" for a whole number, "54.6%" for
 // a decimal, so the figure never claims a precision it was not given.
 const one = (percent: number): string => (Number.isInteger(percent) ? `${percent}%` : `${percent.toFixed(1)}%`)

@@ -6,6 +6,14 @@ The format follows [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- A model switch or MCP change takes the band's line for half a minute, then the usual line comes back with the rewrite as its next-message figure, instead of the alert staying until the next response.
+
+### Removed
+
+- The detail pane and the band's **Details** button: the line above the prompt is all contextwatch draws, and a pane an older version opened is closed. The usage windows are still in `/contextwatch`.
+
 ### Fixed
 
 - The pane follows usage at once (`session.measure`) instead of on the next 30-second tick, and shows percentages as precise as Claude Code reports them.

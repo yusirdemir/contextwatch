@@ -14,9 +14,12 @@ const usage: TurnUsage = {
 // A compaction leaves at least one message: its summary.
 const SUMMARY = [{ role: 'user' as const, text: 'Summary of the conversation so far.', toolUses: [] }]
 
-// What the stand-in engine reports: its MCP servers, and the notifications sent.
+// What the stand-in engine reports: its MCP servers, the notifications sent,
+// and the panes opened and closed.
 let servers: string[] = []
 let notices: string[] = []
+let opened: string[] = []
+let closed: string[] = []
 
 // What `$.session.usage()` reports: the session's spend and, on a
 // subscription, how full the 5-hour and weekly windows are.
@@ -41,10 +44,21 @@ type EngineOptions = {
 const engine = (on: On, options: EngineOptions = {}) => {
   servers = ['github']
   notices = []
+  opened = []
+  closed = []
   mock.store(on)
   on('session.id', () => ({ value: 'session-1' }))
   on('command.register', () => ({ value: { command: 'contextwatch' } }))
-  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.open', (_, e) => {
+    opened.push(e.id)
+
+    return { value: { isPlaced: true } }
+  })
+  on('ui.close', (_, e) => {
+    closed.push(e.id)
+
+    return { value: undefined }
+  })
   on('ui.status', (_, e) => {
     options.onStatus?.(e.text)
 
@@ -148,7 +162,7 @@ test('a response starts the countdown', async ($, on) => {
   for (const surface of ['terminal', 'desktop'] as const) {
     const band = await $.ui.mount({ plugin: 'contextwatch', surface, component: 'AbovePrompt', props: { hasSurvey: false } as never })
     expect((await band.find({ type: 'Text', text: /^Cache/ }))?.text).toBe('Cache warm · 48 min · next message <0.1% ')
-    expect(await band.find({ type: 'Button', key: 'details' })).toBeDefined()
+    expect(await band.find({ type: 'Button', key: 'details' })).toBeUndefined()
     await band.unmount()
   }
 })
@@ -176,42 +190,17 @@ test('the cache goes cold after its TTL', async ($, on) => {
   expect(ran.text).toMatch(/Cache cold/)
 })
 
-test('the pane shows the countdown, the usage windows and the models on request', async ($, on) => {
+test('the band is all it draws: no pane opens, and one an older version left is closed', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
   engine(on)
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await drain($.turn.step(STEP))
   await clock.advance(5 * MIN)
+  await $.command.run({ ...COMMAND, args: '' })
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const pane = await $.ui.mount({
-      plugin: 'contextwatch',
-      surface,
-      component: 'Pane',
-      requestId: 'contextwatch',
-      props: {
-        title: 'Context',
-        isFocused: false,
-        bodyColumns: 60,
-        placement: 'dock',
-        scroll: { offset: 0, bodyRows: 30 },
-        view: {},
-      },
-    })
-    expect((await pane.find({ type: 'Text', text: /^55 min$/ }))?.text).toBe('55 min')
-    expect(await pane.find({ type: 'Text', text: /^5-hour$/ })).toBeDefined()
-    expect((await pane.find({ type: 'Text', text: /^40%$/ }))?.text).toBe('40%')
-    // Warm: no figure for a cold cache that has not happened.
-    expect(await pane.find({ type: 'Text', text: /rewrites the cache/ })).toBeUndefined()
-
-    // The model comparison stays closed until asked for.
-    expect(await pane.find({ type: 'Text', text: /^Sonnet 5\.5/ })).toBeUndefined()
-    await pane.press({ key: 'models' })
-    expect(await pane.find({ type: 'Text', text: /^Sonnet 5\.5/ })).toBeDefined()
-    await pane.press({ key: 'models' })
-    await pane.unmount()
-  }
+  expect(opened).toEqual([])
+  expect(closed).toEqual(['contextwatch'])
 })
 
 const SWITCH = {
@@ -279,18 +268,26 @@ test('no away reminder by default', async ($, on) => {
   expect(notices.length).toBe(0)
 })
 
-test('an MCP server change while warm is flagged in the band', async ($, on) => {
+test('an MCP server change while warm is flagged in the band for a moment', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
   engine(on)
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await drain($.turn.step(STEP))
   servers = ['github', 'slack']
-  await clock.advance(1 * MIN)
+  // The next tick notices it.
+  await clock.advance(30_000)
 
   const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
   expect((await band.find({ type: 'Text', text: /MCP changed/ }))?.text).toMatch(/\+slack/)
   await band.unmount()
+
+  // Half a minute later the usual line is back, and its figure is the rewrite.
+  await clock.advance(30_000)
+  const back = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
+  expect(await back.find({ type: 'Text', text: /MCP changed/ })).toBeUndefined()
+  expect((await back.find({ type: 'Text', text: /^Cache/ }))?.text).toMatch(/^Cache warm · 59 min · next message ~\+2\.7% $/)
+  await back.unmount()
 
   // The next response is sent with the new tools, so the warning clears.
   await drain($.turn.step(STEP))
@@ -313,7 +310,7 @@ test('nothing is pinned under the prompt', async ($, on) => {
   expect(lines).toEqual([undefined])
 })
 
-test('a model switch shows the line above the prompt', async ($, on) => {
+test('a model switch shows in the line above the prompt for a moment', async ($, on) => {
   const clock = mock.clock(on, { now: 0 })
   let model = 'claude-opus-5-5'
   engine(on, { model: () => model })
@@ -321,11 +318,22 @@ test('a model switch shows the line above the prompt', async ($, on) => {
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await drain($.turn.step(STEP))
   model = 'claude-sonnet-5-5'
-  await clock.advance(1 * MIN)
+  // The next tick notices it.
+  await clock.advance(30_000)
 
   const band = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
-  expect((await band.find({ type: 'Text', text: /Switched to/ }))?.text).toMatch(/^Switched to Sonnet 5\.5 · cache rewrite/)
+  const flagged = (await band.find({ type: 'Text', text: /Switched to/ }))?.text
+  expect(flagged).toMatch(/^Switched to Sonnet 5\.5 · cache rewrite ~\+\d/)
   await band.unmount()
+
+  // Then the usual line, its next message the same rewrite.
+  await clock.advance(30_000)
+  const back = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
+  expect(await back.find({ type: 'Text', text: /Switched to/ })).toBeUndefined()
+  const line = (await back.find({ type: 'Text', text: /^Cache/ }))?.text
+  expect(line).toMatch(/^Cache warm · 59 min · next message ~\+\d/)
+  expect(line?.split('next message ')[1]?.trim()).toBe(flagged?.split('cache rewrite ')[1]?.trim())
+  await back.unmount()
 })
 
 test('while cooling the band suggests compacting, with a Compact button', async ($, on) => {
@@ -390,20 +398,6 @@ test('the usage a cold cache would add is learned from the spend', async ($, on)
   const warm = await $.ui.mount({ plugin: 'contextwatch', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false } as never })
   expect((await warm.find({ type: 'Text', text: /Cache/ }))?.text).toBe('Cache warm · 59 min · next message <0.1% ')
   await warm.unmount()
-
-  // The pane says where the 5-hour window lands after it.
-  const pane = await $.ui.mount({
-    plugin: 'contextwatch',
-    surface: 'desktop',
-    component: 'Pane',
-    requestId: 'contextwatch',
-    props: { title: 'Context', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} },
-  })
-  expect((await pane.find({ type: 'Text', text: /^<0\.1%$/ }))?.text).toBe('<0.1%')
-  expect(await pane.find({ type: 'Text', text: /^44% → 44%$/ })).toBeDefined()
-  expect((await pane.find({ type: 'Text', text: /read from cache$/ }))?.text).toMatch(/113k read from cache$/)
-  expect((await pane.find({ type: 'Text', text: /written/ }))?.text).toMatch(/100 written · last answer$/)
-  await pane.unmount()
 
   // Once cold, a rewrite of 113k tokens on Opus 5.5 is ~$0.91, so ~1.8 points.
   await clock.advance(61 * MIN)

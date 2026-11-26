@@ -78,12 +78,12 @@ We follow [Conventional Commits 1.0](https://www.conventionalcommits.org/en/v1.0
 | `perf` | Performance improvement |
 | `chore` | Build, CI, tooling, dependencies |
 
-Scopes, when useful: `core`, `ui`, `pane`, `band`, `status`, `commands`, `ci`, `docs`.
+Scopes, when useful: `core`, `ui`, `band`, `commands`, `ci`, `docs`.
 
 Examples:
 
 ```text
-feat(pane): show the TTL source next to the countdown
+feat(band): show the TTL source next to the countdown
 fix(core): treat a zero-token response as a miss, not a hit
 docs: explain how the TTL is inferred
 ```

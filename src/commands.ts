@@ -6,7 +6,6 @@ import { stayCost } from './core/forecast'
 import { contextTokens, formatPercent, formatTokens, hitRate } from './core/metrics'
 import { formatMinutes, remainingMs, ttlLabel } from './core/ttl'
 import { formatImpact, formatPercentUsed, formatUntil } from './core/usage'
-import { openPane } from './ui/pane'
 
 const history = atom({ plugin: 'contextwatch', key: 'history' } as const, [])
 const now = atom({ plugin: 'contextwatch', key: 'now' } as const, 0)
@@ -21,13 +20,12 @@ export async function registerCommand($: EngineInterface) {
   })
 }
 
-// `/contextwatch` opens the pane and prints the figures; `/contextwatch why` explains the last miss.
+// `/contextwatch` prints the figures; `/contextwatch why` explains the last miss.
 export function answerCommand(on: On) {
   on('command.run', { command: 'contextwatch' }, async ($, e) => {
     const list = await read($, history)
     if (e.args.trim() === 'why') return { text: explainLast(list, await read($, lastCompactAt)) }
 
-    await openPane($)
     const last = list.at(-1)
     if (last === undefined) return { text: 'No response yet in this session.' }
 

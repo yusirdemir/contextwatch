@@ -1,13 +1,14 @@
 import { expect, test } from 'claude-code/testing'
 
 import type { Snapshot } from '../types'
+import { ALERT_MS, alertKey, isFresh } from '../src/core/alert'
 import { compactAdvice } from '../src/core/compact'
 import { explainLast } from '../src/core/explain'
 import { cacheDropped, contextTokens, formatTokens, hitRate } from '../src/core/metrics'
 import { floorCost, nextBreakdown, stayCost, switchOptions } from '../src/core/forecast'
 import { formatUsd, modelLabel, priceOf, promptCost, responseCost } from '../src/core/pricing'
 import { diffServers, formatChange, serversOf } from '../src/core/tools'
-import { calibrate, formatImpact, formatLanding, formatUntil, parseLimits, pointsOf, totalSpend } from '../src/core/usage'
+import { calibrate, formatImpact, formatUntil, parseLimits, totalSpend } from '../src/core/usage'
 import { formatAgo, formatMinutes, inferTtl, remainingMs, warmth } from '../src/core/ttl'
 
 const MIN = 60_000
@@ -147,6 +148,25 @@ test('MCP server changes are read from the tool list', () => {
   expect(formatChange(change!)).toBe('+slack −jira')
 })
 
+test('a switch or MCP change is flagged while warm, and only for a moment', () => {
+  const last = snap({ at: 0 })
+  const change = { added: ['slack'], removed: [] }
+  expect(alertKey(last, MIN, 'claude-opus-5-5', null)).toBeNull()
+  expect(alertKey(last, MIN, 'claude-sonnet-5-5', change)).toBe('switch:claude-sonnet-5-5')
+  expect(alertKey(last, MIN, null, change)).toBe('mcp:+slack')
+  // Cold, the next message rewrites the cache anyway.
+  expect(alertKey(last, 61 * MIN, 'claude-sonnet-5-5', change)).toBeNull()
+  expect(alertKey(undefined, MIN, 'claude-sonnet-5-5', change)).toBeNull()
+
+  const seen = { key: 'mcp:+slack', at: MIN }
+  expect(isFresh(seen, 'mcp:+slack', MIN + ALERT_MS - 1)).toBe(true)
+  expect(isFresh(seen, 'mcp:+slack', MIN + ALERT_MS)).toBe(false)
+  // A different change, or none, is not this alert.
+  expect(isFresh(seen, 'mcp:+jira', MIN)).toBe(false)
+  expect(isFresh(seen, null, MIN)).toBe(false)
+  expect(isFresh(null, 'mcp:+slack', MIN)).toBe(false)
+})
+
 test('compacting while warm beats coming back to a cold cache', () => {
   const list = [snap({ at: 0 })]
   const advice = compactAdvice(list, 52 * MIN, null)
@@ -209,13 +229,6 @@ test('the next message costs at least what the context and the cache say', () =>
   // Cold: all 100,402 tokens written again.
   expect(near(floorCost(list, 61 * MIN), (100_402 * 4 * 2) / 1e6)).toBe(true)
   expect(floorCost([], MIN)).toBeNull()
-
-  const cal = { anchor: null, percentPerUsd: 5, samples: [5] }
-  expect(pointsOf(0.4, cal)).toBe(2)
-  expect(near(pointsOf(0.4, { anchor: null, percentPerUsd: null, samples: [] }), 1.2)).toBe(true)
-  expect(pointsOf(null, cal)).toBeNull()
-  expect(formatLanding({ percent: 41, resetsAt: null }, 2.3)).toBe('41% → 43.3%')
-  expect(formatLanding({ percent: 99, resetsAt: null }, 5)).toBe('99% → 100%')
 })
 
 test('the next message splits into what is read and what is written', () => {

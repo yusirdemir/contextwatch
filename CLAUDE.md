@@ -10,7 +10,7 @@ contextwatch is a Claude Code mod (a plugin with a hooks module) that shows how 
 
 - **English only**: code, comments, docs, commit messages, issue and PR text.
 - **Public repository**: never add employer names, internal hostnames, private repository names, work email addresses, tokens or personal paths. Before committing, check the diff for them.
-- **Commits** follow Conventional Commits (`feat(pane): ...`, `fix(core): ...`). See [CONTRIBUTING.md](CONTRIBUTING.md#commit-messages).
+- **Commits** follow Conventional Commits (`feat(band): ...`, `fix(core): ...`). See [CONTRIBUTING.md](CONTRIBUTING.md#commit-messages).
 - **Changelog**: add a line under **Unreleased** in `CHANGELOG.md` for every user-facing change.
 - **Privacy**: the mod reads token counts and model names only. Do not read message text, write files or make network requests without an issue that agrees to it first; update `SECURITY.md` if that changes.
 
@@ -19,15 +19,15 @@ contextwatch is a Claude Code mod (a plugin with a hooks module) that shows how 
 | Path | Role |
 | --- | --- |
 | `hooks/register.tsx` | Entry point. Wires features together and runs the one-second ticker |
-| `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), `compact.ts` (compact-now advice), `usage.ts` (usage windows, the learned points-per-dollar ratio, impact and landing formatting), formatting |
+| `src/core/` | Pure functions, no `$`. TTL, metrics, `pricing.ts` (list prices), `forecast.ts` (next-message and switch costs), `compact.ts` (compact-now advice), `usage.ts` (usage windows, the learned points-per-dollar ratio, impact formatting), `alert.ts` (how long a change holds the band), formatting |
 | `src/sources/live.ts` | Turns `turn.step` usage into a `Snapshot` and stores it |
 | `src/sources/tools.ts` | MCP servers behind the current tool list |
 | `src/sources/compact.ts` | Learns compaction sizes from `session.compact`; the Compact button's call |
-| `src/ui/` | Band above the prompt, detail pane, theme, `charts.ts` (progress bar as SVG and text) |
+| `src/ui/` | Band above the prompt, theme |
 | `src/commands.ts` | `/contextwatch` and `/contextwatch why` |
 | `src/guards.ts` | Model switch confirmation, away reminder, MCP change check |
 | `src/options.ts` | Reads the `userConfig` options declared in `plugin.json` |
-| `types/index.d.ts` | `$.state` contract: `history`, `now`, `sessionUsd`, `activeModel`, `toolBaseline`, `toolChange`, `lastCompactAt`, `compactStats`, `limits`, `calibration`, `showModels` under `contextwatch` |
+| `types/index.d.ts` | `$.state` contract: `history`, `now`, `sessionUsd`, `activeModel`, `toolBaseline`, `toolChange`, `lastCompactAt`, `compactStats`, `limits`, `calibration`, `alert` under `contextwatch` |
 | `tests/` | `core.test.ts` (pure logic), `plugin.test.tsx` (engine and UI) |
 | `docs/` | How it works, and every field the mod reads |
 
@@ -61,7 +61,7 @@ npx tsc -p .
 
 ## Units
 
-Subscribers see usage as points of the 5-hour window (`formatImpact`), never dollars; dollars appear only where there are no usage windows (an API key). Route every user-facing cost through `formatImpact`. The ratio comes from the shared spend ledger (`accountSpend` in `hooks/register.tsx`) and is the lowest recent sample; never learn it from one session's spend alone. Show a cost only for what is true now (a cold cache, a switch or MCP change about to rewrite it), never a hypothetical "if cold" figure; the next-message figure comes from the last response's usage and the cache state (`floorCost`), never an average of past questions and never a local token estimate. Do not send prompt text anywhere to count it. Usage windows belong in the pane, not the band.
+Subscribers see usage as points of the 5-hour window (`formatImpact`), never dollars; dollars appear only where there are no usage windows (an API key). Route every user-facing cost through `formatImpact`. The ratio comes from the shared spend ledger (`accountSpend` in `hooks/register.tsx`) and is the lowest recent sample; never learn it from one session's spend alone. Show a cost only for what is true now (a cold cache, a switch or MCP change about to rewrite it), never a hypothetical "if cold" figure; the next-message figure comes from the last response's usage and the cache state (`floorCost`), never an average of past questions and never a local token estimate. Do not send prompt text anywhere to count it. Usage windows appear only in `/contextwatch`, never in the band.
 
 ## Prices
 
@@ -69,4 +69,4 @@ Subscribers see usage as points of the 5-hour window (`formatImpact`), never dol
 
 ## Design
 
-The UI must stay calm: one dim line in the band above the prompt with the Details button, no status line; alerts (model switch, MCP change) replace the band's line rather than adding one; colour only for the state marker (theme keys `success`, `warning`, `inactive`), whole minutes only (no seconds, no fast ticking), no animation, no extra toasts. Anything new goes in the pane, not the band. The pane keeps one large figure, shows at most one suggestion at a time, and puts secondary detail behind a toggle. SVG is drawn only where the surface has `Svg`; every chart needs a text fallback for the terminal.
+The UI must stay calm: one dim line in the band above the prompt and nothing else (no pane, no Details button, no status line); alerts (model switch, MCP change) replace the band's line for `ALERT_MS` and then give it back, rather than adding a line; colour only for the state marker (theme keys `success`, `warning`, `inactive`), whole minutes only (no seconds, no fast ticking), no animation, no extra toasts. The band shows at most one suggestion at a time. Secondary figures go in `/contextwatch`, not the band.

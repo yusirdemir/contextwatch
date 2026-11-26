@@ -68,7 +68,7 @@ The new message itself is left out: Claude's tokenizer is not available locally,
 
 **From the first message.** Turning dollars into points of the 5-hour window needs the account's ratio (see Usage limits). Until it is learned, contextwatch uses 3 points per dollar, as measured on a Team seat, and marks the figure with `~`.
 
-The band shows the figure as points of the 5-hour window. The pane shows it as a card: the figure, where the window lands (`41% → 42%`), and a bar split by cost into what is read from the cache (green) and what is written (amber), with the tokens and share of each. The same figure is drawn as a faint segment on the 5-hour usage bar. It grows as the conversation grows and drops after a compaction.
+The band shows the figure as points of the 5-hour window. It grows as the conversation grows and drops after a compaction.
 
 ## Explaining a miss
 
@@ -101,7 +101,7 @@ switch to model M    = warmPrefix × cacheRead(M) + (context − warmPrefix) × 
 
 These figures cover the context alone. The new message and the answer are added on top and are not known in advance.
 
-The session total in the pane is Claude Code's own figure (`$.session.usage().cost.usd`, the same as `/cost`), not an estimate.
+The session total contextwatch reads is Claude Code's own figure (`$.session.usage().cost.usd`, the same as `/cost`), not an estimate.
 
 ## Usage limits
 
@@ -119,7 +119,7 @@ The samples are saved in the store (`calibration.v2`), so a new session starts w
 impact of a cold cache = cold rewrite (list price) × points per dollar
 ```
 
-The pane draws the next message's impact as a faint segment past the 5-hour fill: the next question while warm, the rewrite once cold. Until the first sample, the `+%` figures are left out. Other sessions using the same account at the same time move the window too, which makes the estimate high rather than low.
+Until the first sample, the `+%` figures use the assumed ratio and carry a `~`. Other sessions using the same account at the same time move the window too, which makes the estimate high rather than low.
 
 With an API key there are no windows; contextwatch shows dollars instead.
 
@@ -145,7 +145,7 @@ Claude Code raises `PreModelSwitch` before a switch, with `prompt_cache_warm` an
 
 ### MCP changes
 
-The tool list is part of the cached prompt prefix, so connecting or dropping an MCP server rewrites the cache on the next message. After every response contextwatch records the MCP servers behind the tool list (`mcp__<server>__<tool>`). Each tick compares the current list against it; a difference while the cache is warm shows a warning in the band and the pane and a one-time notice. The next response resets the baseline.
+The tool list is part of the cached prompt prefix, so connecting or dropping an MCP server rewrites the cache on the next message. After every response contextwatch records the MCP servers behind the tool list (`mcp__<server>__<tool>`). Each tick compares the current list against it; a difference while the cache is warm takes the band's line for half a minute and sends a one-time notice. The next response resets the baseline.
 
 ### Cold-send question
 
@@ -163,8 +163,10 @@ When `awayReminder` is on, the tick sends one notice per response once the time 
 
 ## Redrawing
 
-A 30-second ticker writes the engine clock to `contextwatch.now` in session state, and refreshes the session total, usage windows and active model. The band and the pane read these values, so they redraw on each tick and after every turn. The UI shows whole minutes only, so a slower tick changes nothing you can see.
+A 30-second ticker writes the engine clock to `contextwatch.now` in session state, and refreshes the session total, usage windows and active model. The band reads these values, so it redraws on each tick and after every turn. The UI shows whole minutes only, so a slower tick changes nothing you can see.
 
-## Pane layout
+## The band
 
-The pane shows one large figure (minutes left) with a thin progress bar, the usage windows, and at most one suggestion: a model switch or MCP warning, or the compact tip while cooling. The model comparison stays closed until asked for. The content is at most 56 cells wide and centres in a wider pane; the bars fill that width. The desktop app draws the progress bar as SVG in a mid-tone colour that reads on light and dark backgrounds; the terminal draws it with block characters.
+contextwatch draws one line above the prompt and nothing else: no pane, no status line. A model switch or MCP change that will rewrite a warm cache takes the line's place in amber for 30 seconds from the tick that notices it (`contextwatch.alert` holds which change and when it was seen); a one-off tick then brings the usual line back, its next-message figure now the rewrite. A different change shows again; the next response, sent with the new model or tools, clears it.
+
+Older versions opened a pane beside the chat. contextwatch closes it when a session starts.

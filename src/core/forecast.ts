@@ -73,7 +73,7 @@ export const switchOptions = (list: readonly Snapshot[], now: number): Option[] 
 export const floorCost = (list: readonly Snapshot[], now: number): number | null => nextBreakdown(list, now)?.total ?? null
 
 // The next message in two parts: what is read from the cache and what is
-// written to it, in tokens and dollars. The pane draws the dollars as a bar.
+// written to it, in tokens and dollars.
 export type Breakdown = { readTokens: number; writeTokens: number; readUsd: number; writeUsd: number; total: number }
 
 export const nextBreakdown = (list: readonly Snapshot[], now: number): Breakdown | null => {
